@@ -151,7 +151,8 @@ async function extractErrorText(response: Response): Promise<string> {
 
 interface LLMEngine {
 	generateStream(
-		messages: ChatMessage[]
+		messages: ChatMessage[],
+		temperature?: number
 	): AsyncGenerator<string, void, undefined>;
 	generateFull(messages: ChatMessage[]): Promise<string>;
 	dispose(): Promise<void>;
@@ -330,11 +331,12 @@ class MLCEngineWrapper implements LLMEngine {
 	}
 
 	async *generateStream(
-		messages: ChatMessage[]
+		messages: ChatMessage[],
+		temperature = 0.3
 	): AsyncGenerator<string, void, undefined> {
 		const chunks = await this.rawEngine.chat.completions.create({
 			messages,
-			temperature: 0.3,
+			temperature,
 			max_tokens: 1024,
 			stream: true,
 		});
@@ -392,7 +394,8 @@ class GeminiEngineWrapper implements LLMEngine {
 
 	private async collectGeminiStream(
 		messages: ChatMessage[],
-		apiKey: string
+		apiKey: string,
+		temperature = 0.2
 	): Promise<{ chunks: string[]; tokensIn?: number; tokensOut?: number }> {
 		let history;
 		let prompt;
@@ -407,6 +410,7 @@ class GeminiEngineWrapper implements LLMEngine {
 		const genAI = new GoogleGenerativeAI(apiKey);
 		const model = genAI.getGenerativeModel({
 			model: "gemini-2.5-flash",
+			generationConfig: { temperature },
 		});
 		const chat = model.startChat({ history });
 
@@ -430,7 +434,8 @@ class GeminiEngineWrapper implements LLMEngine {
 	}
 
 	async *generateStream(
-		messages: ChatMessage[]
+		messages: ChatMessage[],
+		temperature = 0.2
 	): AsyncGenerator<string, void, undefined> {
 		if (this.useProxy) {
 			// Proxy via server
@@ -523,7 +528,7 @@ class GeminiEngineWrapper implements LLMEngine {
 
 		if (this.apiKey) {
 			this.lastUsage = null;
-			const result = await this.collectGeminiStream(messages, this.apiKey);
+			const result = await this.collectGeminiStream(messages, this.apiKey, temperature);
 			this.lastUsage = { tokensIn: result.tokensIn, tokensOut: result.tokensOut };
 			for (const chunk of result.chunks) {
 				yield chunk;
@@ -534,7 +539,7 @@ class GeminiEngineWrapper implements LLMEngine {
 		// BYOK: run inside vault scope, collect chunks then yield
 		if (!this.vault) throw new Error("Vault not configured");
 		this.lastUsage = null;
-		const runWithKey = (apiKey: string) => this.collectGeminiStream(messages, apiKey);
+		const runWithKey = (apiKey: string) => this.collectGeminiStream(messages, apiKey, temperature);
 		const result = await this.vault.withKeyScope(async () =>
 			this.vault!.withKey(runWithKey)
 		);
@@ -591,7 +596,8 @@ class GroqEngineWrapper implements LLMEngine {
 
 	private async collectGroqStream(
 		messages: ChatMessage[],
-		apiKey: string
+		apiKey: string,
+		temperature = 0.2
 	): Promise<{ chunks: string[]; tokensIn?: number; tokensOut?: number }> {
 		try {
 			const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -605,7 +611,7 @@ class GroqEngineWrapper implements LLMEngine {
 					messages: this.toOpenAIChatMessages(messages),
 					stream: true,
 					stream_options: { include_usage: true },
-					temperature: 0.2,
+					temperature,
 				}),
 			});
 
@@ -680,7 +686,8 @@ class GroqEngineWrapper implements LLMEngine {
 	}
 
 	async *generateStream(
-		messages: ChatMessage[]
+		messages: ChatMessage[],
+		temperature = 0.2
 	): AsyncGenerator<string, void, undefined> {
 		if (this.useProxy) {
 			const response = await fetch("/api/groq", {
@@ -769,7 +776,7 @@ class GroqEngineWrapper implements LLMEngine {
 
 		if (this.apiKey) {
 			this.lastUsage = null;
-			const result = await this.collectGroqStream(messages, this.apiKey);
+			const result = await this.collectGroqStream(messages, this.apiKey, temperature);
 			this.lastUsage = { tokensIn: result.tokensIn, tokensOut: result.tokensOut };
 			for (const chunk of result.chunks) {
 				yield chunk;
@@ -779,7 +786,7 @@ class GroqEngineWrapper implements LLMEngine {
 
 		if (!this.vault) throw new Error("Vault not configured");
 		this.lastUsage = null;
-		const runWithKey = (apiKey: string) => this.collectGroqStream(messages, apiKey);
+		const runWithKey = (apiKey: string) => this.collectGroqStream(messages, apiKey, temperature);
 		const result = await this.vault.withKeyScope(async () =>
 			this.vault!.withKey(runWithKey)
 		);
@@ -921,7 +928,8 @@ export async function reloadLLM(onProgress?: (msg: string) => void) {
 // ─── Public API ─────────────────────────────────────────────────────────────
 
 export async function* generate(
-	messages: ChatMessage[]
+	messages: ChatMessage[],
+	temperature?: number
 ): AsyncGenerator<string, void, undefined> {
 	if (!activeEngine)
 		throw new Error("LLM not initialised. Call initLLM() first.");
@@ -941,7 +949,7 @@ export async function* generate(
 
 	setStatus("generating");
 	try {
-		const stream = activeEngine.generateStream(messages);
+		const stream = activeEngine.generateStream(messages, temperature);
 		for await (const chunk of stream) {
 			outputChars += chunk.length;
 			yield chunk;

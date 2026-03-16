@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { VectorStore } from "@/lib/vectorStore";
 import { multiPathHybridSearch } from "@/lib/search";
-import { generate, getLLMConfig } from "@/lib/llm";
+import { generate, initLLM, getLLMConfig } from "@/lib/llm";
 import { buildSafeContext, scanChunksForInjection } from "@/lib/promptSafety";
 import { buildChatRequestMessages } from "@/lib/chatHistory";
 import { defaultLimitsForProvider } from "@/lib/contextAssembly";
@@ -85,6 +85,16 @@ export function SecurityScanModal({ owner, repo, store, onClose }: SecurityScanM
 		setScannedAt(new Date());
 		setSections(SCAN_SECTIONS.map((s) => ({ id: s.id, label: s.label, status: "pending", output: "" })));
 
+		// Ensure LLM is initialized before scanning
+		try {
+			await initLLM();
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			setErrorMsg(msg);
+			setPhase("error");
+			return;
+		}
+
 		const config = getLLMConfig();
 		const provider = config.provider === "gemini" || config.provider === "groq" ? config.provider : "mlc";
 		const limits = defaultLimitsForProvider(provider);
@@ -124,9 +134,9 @@ export function SecurityScanModal({ owner, repo, store, onClose }: SecurityScanM
 					userMessage: userPrompt,
 				});
 
-				// Stream response
+				// Stream response — temperature 0 for deterministic, consistent scan results
 				let fullOutput = "";
-				for await (const token of generate(messages)) {
+				for await (const token of generate(messages, 0)) {
 					if (abortRef.current) break;
 					fullOutput += token;
 					updateSection(section.id, { output: fullOutput });
@@ -293,6 +303,51 @@ export function SecurityScanModal({ owner, repo, store, onClose }: SecurityScanM
 							{allFindings.length} finding{allFindings.length !== 1 ? "s" : ""} so far
 						</div>
 					)}
+				</div>
+			</ModalShell>
+		);
+	}
+
+	// ─── Error state — LLM not configured ─────────────────────────────────
+
+	if (phase === "error") {
+		return (
+			<ModalShell onClose={onClose}>
+				<div style={{ padding: "40px", textAlign: "center", maxWidth: 480, margin: "0 auto" }}>
+					<div style={{
+						width: 48, height: 48, borderRadius: "50%",
+						background: "var(--critical-red, #B71C1C)",
+						display: "flex", alignItems: "center", justifyContent: "center",
+						margin: "0 auto 20px",
+					}}>
+						<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5} strokeLinecap="round">
+							<circle cx={12} cy={12} r={10} /><line x1={12} y1={8} x2={12} y2={12} /><line x1={12} y1={16} x2={12.01} y2={16} />
+						</svg>
+					</div>
+					<h2 style={{ fontFamily: "var(--font-display)", fontWeight: 900, fontSize: "1.1rem", margin: "0 0 10px" }}>
+						LLM Not Ready
+					</h2>
+					<p style={{ color: "var(--ink-medium)", fontSize: 13, lineHeight: 1.6, margin: "0 0 8px" }}>
+						{errorMsg ?? "The LLM is not configured. Open Settings and add an API key or load a local model."}
+					</p>
+					<p style={{ color: "var(--ink-light)", fontSize: 12, fontFamily: "var(--font-mono)", margin: "0 0 24px" }}>
+						Click the settings icon in the chat header, then add a Gemini or Groq API key.
+					</p>
+					<button
+						onClick={() => setPhase("idle")}
+						style={{
+							padding: "9px 20px",
+							border: "2px solid var(--border-black)",
+							background: "var(--bg-paper)",
+							color: "var(--ink-medium)",
+							fontFamily: "var(--font-mono)",
+							fontSize: 11,
+							cursor: "pointer",
+							borderRadius: 2,
+						}}
+					>
+						← Back
+					</button>
 				</div>
 			</ModalShell>
 		);
