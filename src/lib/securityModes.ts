@@ -159,3 +159,37 @@ export const ALL_MODES: SecurityMode[] = [
 	"code-security",
 	"cross-domain",
 ];
+
+/**
+ * Append this to every security system prompt so the LLM always produces
+ * a consistently structured findings block that extractFindings() can parse.
+ *
+ * Format must match the Format 1 parser in reportGenerator.ts:
+ *   - Severity table matched by parseSeverityTable()
+ *   - Numbered sections split on /\n(?=\d+\.\s+\S)/
+ *   - Title: /^\d+\.\s+\*{0,2}([^*\n]+?)\*{0,2}\s*$/m
+ *   - Sub-fields: Description: / Location: / Recommendation:
+ */
+export const FINDINGS_FORMAT_INSTRUCTION = `
+
+REPORT FORMAT (always use this exact structure when listing findings or issues):
+
+If you identify multiple findings, vulnerabilities, or issues, structure them like this:
+
+Severity Level of Findings:
+<Finding Title 1>: <Critical|High|Medium|Low|Info>
+<Finding Title 2>: <Critical|High|Medium|Low|Info>
+
+1. <Finding Title 1>
+Description: <one or two sentences — what the issue is>
+Location: <file path, CVE ID, technique ID, control ID, or data source reference>
+Recommendation: <one or two sentences — what to do to fix or mitigate it>
+
+2. <Finding Title 2>
+Description: <one or two sentences>
+Location: <reference>
+Recommendation: <what to do>
+
+(continue for each finding)
+
+Use this format consistently. Do not use tables, bold-only lines, or bullet lists as the primary findings structure.`;

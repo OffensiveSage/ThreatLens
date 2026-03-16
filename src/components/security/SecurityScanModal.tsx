@@ -98,21 +98,30 @@ export function SecurityScanModal({ owner, repo, store, onClose }: SecurityScanM
 		const config = getLLMConfig();
 		const provider = config.provider === "gemini" || config.provider === "groq" ? config.provider : "mlc";
 		const limits = defaultLimitsForProvider(provider);
+		// Cloud APIs have tokens-per-minute limits — pace sequential calls to avoid rate limit errors
+		const interSectionDelayMs = provider === "mlc" ? 0 : 2000;
 
 		const accumulated: ScanFinding[] = [];
 
-		for (const section of SCAN_SECTIONS) {
+		for (let sIdx = 0; sIdx < SCAN_SECTIONS.length; sIdx++) {
+			const section = SCAN_SECTIONS[sIdx];
+			if (abortRef.current) break;
+
+			// Delay between sections to respect cloud API rate limits
+			if (sIdx > 0 && interSectionDelayMs > 0) {
+				await new Promise<void>((resolve) => setTimeout(resolve, interSectionDelayMs));
+			}
 			if (abortRef.current) break;
 
 			updateSection(section.id, { status: "running" });
 
-			try {
+			const runSection = async (attempt: number): Promise<void> => {
 				// Retrieve relevant chunks for this section
 				const results = await multiPathHybridSearch(store, section.queries, { limit: 12 });
 
 				if (results.length === 0) {
 					updateSection(section.id, { status: "done", output: "NO_FINDINGS" });
-					continue;
+					return;
 				}
 
 				// Safety scan + context assembly
@@ -121,7 +130,7 @@ export function SecurityScanModal({ owner, repo, store, onClose }: SecurityScanM
 
 				if (!safeContext.trim()) {
 					updateSection(section.id, { status: "done", output: "NO_FINDINGS" });
-					continue;
+					return;
 				}
 
 				// Build messages
@@ -136,10 +145,22 @@ export function SecurityScanModal({ owner, repo, store, onClose }: SecurityScanM
 
 				// Stream response — temperature 0 for deterministic, consistent scan results
 				let fullOutput = "";
-				for await (const token of generate(messages, 0)) {
-					if (abortRef.current) break;
-					fullOutput += token;
-					updateSection(section.id, { output: fullOutput });
+				try {
+					for await (const token of generate(messages, 0)) {
+						if (abortRef.current) break;
+						fullOutput += token;
+						updateSection(section.id, { output: fullOutput });
+					}
+				} catch (err) {
+					const msg = err instanceof Error ? err.message : String(err);
+					const isRateLimit = /rate.?limit|quota|too.?many.?request|429/i.test(msg);
+					// Retry once after a longer pause on rate limit errors
+					if (isRateLimit && attempt === 0) {
+						updateSection(section.id, { output: "Rate limited — retrying in 8s…" });
+						await new Promise<void>((resolve) => setTimeout(resolve, 8000));
+						if (!abortRef.current) return runSection(1);
+					}
+					throw err;
 				}
 
 				// Parse findings
@@ -147,7 +168,10 @@ export function SecurityScanModal({ owner, repo, store, onClose }: SecurityScanM
 				accumulated.push(...sectionFindings);
 				setAllFindings([...accumulated]);
 				updateSection(section.id, { status: "done", output: fullOutput });
+			};
 
+			try {
+				await runSection(0);
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
 				updateSection(section.id, { status: "error", output: `Error: ${msg}` });

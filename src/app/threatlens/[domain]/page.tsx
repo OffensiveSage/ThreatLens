@@ -38,6 +38,7 @@ import {
 	selectMode,
 	DOMAIN_DEFAULT_MODE,
 	SECURITY_MODE_PROMPTS,
+	FINDINGS_FORMAT_INSTRUCTION,
 	MODE_META,
 	ALL_MODES,
 	type SecurityMode,
@@ -1063,7 +1064,7 @@ export default function SecurityDomainPage({
 
 			// Build system prompt using active analyst mode
 			const modePrompt = SECURITY_MODE_PROMPTS[activeMode];
-			const systemPrompt = `${modePrompt}\n\nSecurity knowledge context:\n${safeCtx.safeContext}`;
+			const systemPrompt = `${modePrompt}${FINDINGS_FORMAT_INSTRUCTION}\n\nSecurity knowledge context:\n${safeCtx.safeContext}`;
 
 			const chatMessages = buildChatRequestMessages({
 				provider: config.provider,
