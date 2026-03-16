@@ -204,29 +204,42 @@ export default function DashboardPage() {
 						<span className="pulse" style={{ marginRight: 8 }}>●</span> Loading indexed data…
 					</div>
 				) : !data || data.totalChunks === 0 ? (
-					<div style={{ textAlign: "center", padding: "80px 24px" }}>
-						<div
-							style={{
-								fontFamily: "var(--font-display)",
-								fontSize: "1.2rem",
-								color: "var(--ink-medium)",
-								textTransform: "uppercase",
-								letterSpacing: "0.05em",
-								marginBottom: 16,
-							}}
-						>
-							No data indexed yet
+					<div style={{ padding: "48px 0" }}>
+						<div style={{ marginBottom: 32 }}>
+							<h2 style={{ fontFamily: "var(--font-display)", fontSize: "1.3rem", color: "var(--ink-black)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
+								No Security Sources Indexed
+							</h2>
+							<p style={{ color: "var(--ink-medium)", fontFamily: "var(--font-mono)", fontSize: "12px", margin: 0 }}>
+								The dashboard visualizations need security knowledge bases indexed. Click a source below to index it.
+							</p>
 						</div>
-						<p style={{ color: "var(--ink-light)", fontFamily: "var(--font-mono)", fontSize: "13px" }}>
-							Connect a source from the home page to see visualizations here.
+						<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16, marginBottom: 28 }}>
+							{[
+								{ key: "attack", label: "MITRE ATT&CK", desc: "700+ techniques & groups. Drives the coverage heatmap.", color: "#F5A623", note: "~50 MB · one-time" },
+								{ key: "sigma", label: "Sigma Rules", desc: "Detection rules mapped to ATT&CK. Powers coverage gap analysis.", color: "#66BB6A", note: "~2000 rules" },
+								{ key: "nvd", label: "NVD / CVEs", desc: "Recent CVEs with CVSS scores. Populates severity charts.", color: "#FF4444", note: "Last 90 days" },
+								{ key: "nist", label: "NIST 800-53", desc: "All control families across baselines.", color: "#64B5F6", note: "Rev 5 · full catalog" },
+							].map(({ key, label, desc, color, note }) => (
+								<div
+									key={key}
+									className="paper-card"
+									style={{ padding: 20, cursor: "pointer" }}
+									onClick={() => router.push(`/threatlens/${key}`)}
+									onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "var(--shadow-hover)"; }}
+									onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "var(--shadow-layer-1)"; }}
+								>
+									<div style={{ fontFamily: "var(--font-display)", fontSize: "0.9rem", fontWeight: 900, color, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>{label}</div>
+									<p style={{ fontFamily: "var(--font-sans)", fontSize: "12px", color: "var(--ink-medium)", margin: "0 0 12px", lineHeight: 1.5 }}>{desc}</p>
+									<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+										<span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: "var(--ink-light)" }}>{note}</span>
+										<span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color, fontWeight: 700 }}>Index →</span>
+									</div>
+								</div>
+							))}
+						</div>
+						<p style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--ink-light)", borderTop: "1.5px solid var(--border-black)", paddingTop: 16 }}>
+							Note: GitHub repo scans are separate. Index the sources above for ATT&amp;CK coverage, Sigma rules, CVE charts, and the cross-domain graph.
 						</p>
-						<button
-							onClick={() => router.push("/")}
-							className="btn-primary"
-							style={{ marginTop: 24 }}
-						>
-							Go to Sources →
-						</button>
 					</div>
 				) : (
 					<>
