@@ -1,6 +1,6 @@
 <div align="center">
 
-# SecAsk
+# ThreatLens
 
 **Ask your security stack anything.**
 
@@ -15,9 +15,9 @@ Cross-domain retrieval. No server. No cloud. Everything runs in your tab.
 
 ---
 
-## What is SecAsk?
+## What is ThreatLens?
 
-SecAsk is a local-first security knowledge platform. You pick a data source — MITRE ATT&CK, a Sigma rule corpus, recent CVEs, NIST 800-53 controls, or files you upload yourself — and it indexes everything directly in your browser using WebGPU-accelerated embeddings. Then you chat against it.
+ThreatLens is a local-first security knowledge platform. You pick a data source — MITRE ATT&CK, a Sigma rule corpus, recent CVEs, NIST 800-53 controls, or files you upload yourself — and it indexes everything directly in your browser using WebGPU-accelerated embeddings. Then you chat against it.
 
 No data ever leaves your machine. No API key required to get started (bring your own for cloud LLMs, or run a model locally with WebLLM). Indexes are cached in IndexedDB so subsequent loads are instant.
 
@@ -29,11 +29,11 @@ It's built for detection engineers, threat hunters, vulnerability analysts, and 
 
 | Source | Route | What gets indexed |
 |--------|-------|-------------------|
-| **MITRE ATT&CK** | `/secask/attack` | All techniques, sub-techniques, tactics, threat groups, software, mitigations — from the official STIX bundle |
-| **Sigma Rules** | `/secask/sigma` | Community detection rules from SigmaHQ (Windows, Linux, Cloud, Network) with ATT&CK tag mapping |
-| **NVD / CVEs** | `/secask/nvd` | Recent CVEs from the NIST NVD API — CVSS v3 scores, CWE references, affected products |
-| **NIST 800-53** | `/secask/nist` | All control families across LOW / MODERATE / HIGH baselines, control enhancements, supplemental guidance |
-| **Custom Upload** | `/secask/custom` | Your own TXT, MD, JSON, YAML, or PDF files — pentest reports, runbooks, policies, anything |
+| **MITRE ATT&CK** | `/threatlens/attack` | All techniques, sub-techniques, tactics, threat groups, software, mitigations — from the official STIX bundle |
+| **Sigma Rules** | `/threatlens/sigma` | Community detection rules from SigmaHQ (Windows, Linux, Cloud, Network) with ATT&CK tag mapping |
+| **NVD / CVEs** | `/threatlens/nvd` | Recent CVEs from the NIST NVD API — CVSS v3 scores, CWE references, affected products |
+| **NIST 800-53** | `/threatlens/nist` | All control families across LOW / MODERATE / HIGH baselines, control enhancements, supplemental guidance |
+| **Custom Upload** | `/threatlens/custom` | Your own TXT, MD, JSON, YAML, or PDF files — pentest reports, runbooks, policies, anything |
 
 > **First-time indexing** downloads public data directly in your browser (~15–80 MB depending on source). Subsequent loads are served from the local IndexedDB cache.
 
@@ -51,13 +51,13 @@ It's built for detection engineers, threat hunters, vulnerability analysts, and 
 "Find all techniques in my uploaded threat model that overlap with indexed Sigma rules"
 ```
 
-SecAsk will search across all indexed sources in a single query, automatically correlate ATT&CK IDs ↔ Sigma tags ↔ CVE references ↔ NIST controls, and ground every answer in citations back to the source chunks.
+ThreatLens will search across all indexed sources in a single query, automatically correlate ATT&CK IDs ↔ Sigma tags ↔ CVE references ↔ NIST controls, and ground every answer in citations back to the source chunks.
 
 ---
 
 ## Analyst Modes
 
-SecAsk detects the right mode from your query automatically, or you can pin one manually from the input bar:
+ThreatLens detects the right mode from your query automatically, or you can pin one manually from the input bar:
 
 | Mode | Best for |
 |------|----------|
@@ -73,7 +73,7 @@ SecAsk detects the right mode from your query automatically, or you can pin one 
 
 ```bash
 git clone <repo-url>
-cd SecAsk
+cd ThreatLens
 npm install
 npm run dev
 ```
@@ -168,7 +168,7 @@ No dark mode. Intentional — you should be able to read it in daylight.
 src/
 ├── app/
 │   ├── page.tsx                    # Landing page — source cards + hero
-│   ├── secask/[domain]/page.tsx    # Chat interface for each security source
+│   ├── threatlens/[domain]/page.tsx    # Chat interface for each security source
 │   └── globals.css                 # Full design system (~2000 lines)
 ├── components/
 │   ├── SourceCard.tsx              # Landing source connector card
@@ -203,7 +203,7 @@ export async function indexYourSource(
 }
 ```
 
-Then add a route in `DOMAIN_META` inside `secask/[domain]/page.tsx` and a card on the landing page. That's it.
+Then add a route in `DOMAIN_META` inside `threatlens/[domain]/page.tsx` and a card on the landing page. That's it.
 
 ---
 

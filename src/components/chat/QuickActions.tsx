@@ -178,7 +178,7 @@ export async function checkNvdIndexed(): Promise<boolean> {
 				const store = tx.objectStore("repos");
 				const keysReq = store.getAllKeys();
 				keysReq.onsuccess = () => {
-					resolve((keysReq.result as string[]).some((k) => k.startsWith("secask/nvd")));
+					resolve((keysReq.result as string[]).some((k) => k.startsWith("threatlens/nvd")));
 				};
 				keysReq.onerror = () => resolve(false);
 			};

@@ -4,7 +4,7 @@
  * Fetches the NIST 800-53 Rev 5 OSCAL catalog JSON, parses each control
  * and enhancement into CodeChunks, embeds, and stores in the VectorStore.
  *
- * Cache key: "secask" / "nist" / NIST_CACHE_KEY
+ * Cache key: "threatlens" / "nist" / NIST_CACHE_KEY
  * FilePath convention: nist://control/AC-2, nist://control/AC-2(1)
  */
 
@@ -185,7 +185,7 @@ export async function indexNIST(
 	signal?: AbortSignal
 ): Promise<ConnectorResult> {
 	// 1. Check cache
-	const cached = await store.loadFromCache("secask", "nist", NIST_CACHE_KEY);
+	const cached = await store.loadFromCache("threatlens", "nist", NIST_CACHE_KEY);
 	if (cached) {
 		onProgress?.({
 			phase: "cached",
@@ -264,7 +264,7 @@ export async function indexNIST(
 	store.insert(embedded);
 
 	onProgress?.({ phase: "persisting", message: "Saving NIST index…", current: 0, total: 1 });
-	await store.persist("secask", "nist", NIST_CACHE_KEY);
+	await store.persist("threatlens", "nist", NIST_CACHE_KEY);
 
 	onProgress?.({
 		phase: "done",

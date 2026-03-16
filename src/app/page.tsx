@@ -314,12 +314,12 @@ export default function LandingPage() {
         boxShadow: SHADOW_1,
       }}>
         <span style={{ fontFamily: "var(--font-display)", fontWeight: 900, fontSize: "1.25rem", letterSpacing: "0.02em", color: "var(--ink-black)", textTransform: "uppercase" }}>
-          SecAsk
+          ThreatLens
         </span>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <ModelSettings />
           <a
-            href="https://github.com/FloareDor/gitask"
+            href="https://github.com/OffensiveSage/ThreatLens"
             target="_blank"
             rel="noopener noreferrer"
             style={{
@@ -503,7 +503,7 @@ export default function LandingPage() {
               status="idle"
               isComingSoon={false}
               buttonLabel="Index ATT&CK →"
-              onAction={() => router.push("/secask/attack")}
+              onAction={() => router.push("/threatlens/attack")}
               animationDelay={0.05}
             />
 
@@ -517,7 +517,7 @@ export default function LandingPage() {
               status="idle"
               isComingSoon={false}
               buttonLabel="Index Sigma Rules →"
-              onAction={() => router.push("/secask/sigma")}
+              onAction={() => router.push("/threatlens/sigma")}
               animationDelay={0.1}
             />
 
@@ -531,7 +531,7 @@ export default function LandingPage() {
               status="idle"
               isComingSoon={false}
               buttonLabel="Index NVD →"
-              onAction={() => router.push("/secask/nvd")}
+              onAction={() => router.push("/threatlens/nvd")}
               animationDelay={0.15}
             />
 
@@ -545,7 +545,7 @@ export default function LandingPage() {
               status="idle"
               isComingSoon={false}
               buttonLabel="Index NIST →"
-              onAction={() => router.push("/secask/nist")}
+              onAction={() => router.push("/threatlens/nist")}
               animationDelay={0.2}
             />
 
@@ -560,7 +560,7 @@ export default function LandingPage() {
               isComingSoon={false}
               hasDropZone={false}
               buttonLabel="Upload File →"
-              onAction={() => router.push("/secask/custom")}
+              onAction={() => router.push("/threatlens/custom")}
               animationDelay={0.25}
             />
           </div>
@@ -655,7 +655,7 @@ export default function LandingPage() {
                 <button
                   key={q}
                   className="query-chip"
-                  onClick={() => router.push(`/secask/${domainForQuery}`)}
+                  onClick={() => router.push(`/threatlens/${domainForQuery}`)}
                 >
                   {q}
                 </button>
@@ -722,12 +722,12 @@ export default function LandingPage() {
       {/* ── FOOTER ── */}
       <footer style={{ padding: "24px 40px", background: "var(--bg-paper)", borderTop: "2.5px solid var(--border-black)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontFamily: "var(--font-display)", fontWeight: 900, fontSize: "1rem", color: "var(--ink-medium)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          SecAsk
+          ThreatLens
         </span>
         <div style={{ display: "flex", gap: 16 }}>
           <a href="/ablation" style={{ fontSize: "12px", color: "var(--ink-medium)", textDecoration: "none", fontFamily: "var(--font-mono)" }}>Ablation</a>
           <a href="/metrics" style={{ fontSize: "12px", color: "var(--ink-medium)", textDecoration: "none", fontFamily: "var(--font-mono)" }}>Metrics</a>
-          <a href="https://github.com/FloareDor/gitask" target="_blank" rel="noopener noreferrer" style={{ fontSize: "12px", color: "var(--ink-medium)", textDecoration: "none", fontFamily: "var(--font-mono)" }}>GitHub</a>
+          <a href="https://github.com/OffensiveSage/ThreatLens" target="_blank" rel="noopener noreferrer" style={{ fontSize: "12px", color: "var(--ink-medium)", textDecoration: "none", fontFamily: "var(--font-mono)" }}>GitHub</a>
         </div>
       </footer>
 

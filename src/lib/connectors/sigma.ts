@@ -5,7 +5,7 @@
  * parses each YAML rule file with a lightweight extractor, creates CodeChunks,
  * embeds, and stores in the VectorStore.
  *
- * Cache key: "secask" / "sigma" / latest commit SHA
+ * Cache key: "threatlens" / "sigma" / latest commit SHA
  * FilePath convention: sigma://rule/{rule-id}
  */
 
@@ -270,7 +270,7 @@ export async function indexSigma(
 	const cacheKey = SIGMA_CACHE_PREFIX + sha.slice(0, 12);
 
 	// 2. Check cache
-	const cached = await store.loadFromCache("secask", "sigma", cacheKey);
+	const cached = await store.loadFromCache("threatlens", "sigma", cacheKey);
 	if (cached) {
 		onProgress?.({
 			phase: "cached",
@@ -375,7 +375,7 @@ export async function indexSigma(
 	store.insert(embedded);
 
 	onProgress?.({ phase: "persisting", message: "Saving Sigma index…", current: 0, total: 1 });
-	await store.persist("secask", "sigma", cacheKey);
+	await store.persist("threatlens", "sigma", cacheKey);
 
 	onProgress?.({
 		phase: "done",

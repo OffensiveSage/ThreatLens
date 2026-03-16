@@ -371,7 +371,7 @@ export default function RepoPage({
 					completedWhileHiddenRef.current = true;
 					if (typeof Notification !== "undefined" && Notification.permission === "granted") {
 						try {
-							new Notification("GitAsk", {
+							new Notification("ThreatLens", {
 								body: `Indexing complete for ${owner}/${repo}. You can ask questions now.`,
 							});
 						} catch { /* ignore */ }
@@ -792,7 +792,7 @@ export default function RepoPage({
 				? "Answer as a direct, helpful code assistant: direct, human, simple English. Use correct technical terms but no fluff or filler phrases. Cite file paths naturally. If the context does not cover the question, say so plainly."
 				: "Be concise. Cite file paths when relevant. Say if the context does not cover the question.";
 
-			const systemPrompt = `You are GitAsk, a code assistant for the ${owner}/${repo} repository. ${personality}
+			const systemPrompt = `You are ThreatLens, a code assistant for the ${owner}/${repo} repository. ${personality}
 
 Epistemic contract:
 - Only put facts in "Known" when explicitly supported by context.

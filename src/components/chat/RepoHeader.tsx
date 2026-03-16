@@ -105,7 +105,7 @@ export function RepoHeader({
 					</button>
 				)}
 				<a href="/" style={{ fontFamily: "var(--font-display)", fontWeight: 900, fontSize: "0.95rem", color: "var(--ink-black)", textDecoration: "none", textTransform: "uppercase" }}>
-					SecAsk
+					ThreatLens
 				</a>
 				<span style={{ color: "var(--ink-medium)", fontSize: "0.9rem" }}>/</span>
 				<span style={{ fontFamily: "var(--font-mono)", fontSize: "0.8rem", color: "var(--ink-medium)", padding: "2px 8px", border: "1.5px solid var(--border-black)", background: "var(--bg-paper-alt)" }}>

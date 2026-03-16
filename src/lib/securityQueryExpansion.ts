@@ -1,5 +1,5 @@
 /**
- * Security-focused query expansion for the SecAsk RAG pipeline.
+ * Security-focused query expansion for the ThreatLens RAG pipeline.
  *
  * Two modes mirror queryExpansion.ts:
  *  - LLM-powered: generateSecurityQueryVariants — generates a technique-focused

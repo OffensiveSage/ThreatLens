@@ -8,21 +8,21 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "SecAsk — Ask your security stack anything",
+  title: "ThreatLens — Ask your security stack anything",
   description:
     "Browser-native security knowledge platform. Index MITRE ATT&CK, Sigma rules, CVEs, NIST 800-53, code repos. Chat across all sources with cross-domain retrieval. No server, everything local.",
   keywords:
     "security, MITRE ATT&CK, Sigma rules, CVE, NVD, NIST 800-53, threat intelligence, detection engineering, compliance, RAG, browser-native, local AI",
   openGraph: {
-    title: "SecAsk — Ask your security stack anything",
+    title: "ThreatLens — Ask your security stack anything",
     description:
       "Index security knowledge sources in your browser. Cross-domain RAG across ATT&CK, Sigma, CVEs, NIST, and code. Everything local.",
     type: "website",
-    siteName: "SecAsk",
+    siteName: "ThreatLens",
   },
   twitter: {
     card: "summary_large_image",
-    title: "SecAsk — Ask your security stack anything",
+    title: "ThreatLens — Ask your security stack anything",
     description:
       "Browser-native security knowledge platform with cross-domain retrieval.",
   },

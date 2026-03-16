@@ -1,5 +1,5 @@
 /**
- * Security analyst mode system for SecAsk.
+ * Security analyst mode system for ThreatLens.
  *
  * 6 analyst roles auto-detected from query keywords.
  * Each mode provides a specialized system prompt optimised for that

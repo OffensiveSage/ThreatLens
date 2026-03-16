@@ -5,7 +5,7 @@
  * affected products, and descriptions into CodeChunks, then embeds
  * and stores in the VectorStore.
  *
- * Cache key: "secask" / "nvd" / options-fingerprint
+ * Cache key: "threatlens" / "nvd" / options-fingerprint
  * FilePath convention: nvd://cve/CVE-2024-XXXXX
  *
  * Rate limits:
@@ -240,7 +240,7 @@ export async function indexNVD(
 	const cacheKey = makeNVDCacheKey({ ...options, pubStartDate, pubEndDate });
 
 	// 1. Check cache
-	const cached = await store.loadFromCache("secask", "nvd", cacheKey);
+	const cached = await store.loadFromCache("threatlens", "nvd", cacheKey);
 	if (cached) {
 		onProgress?.({
 			phase: "cached",
@@ -335,7 +335,7 @@ export async function indexNVD(
 	store.insert(embedded);
 
 	onProgress?.({ phase: "persisting", message: "Saving NVD index…", current: 0, total: 1 });
-	await store.persist("secask", "nvd", cacheKey);
+	await store.persist("threatlens", "nvd", cacheKey);
 
 	onProgress?.({
 		phase: "done",

@@ -1,5 +1,5 @@
 ﻿/**
- * Ablation Study - Benchmarks the GitAsk retrieval pipeline
+ * Ablation Study - Benchmarks the ThreatLens retrieval pipeline
  * across configurations measuring Recall@5, MRR, NDCG@10, and latency.
  */
 

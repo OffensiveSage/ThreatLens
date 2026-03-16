@@ -5,7 +5,7 @@
  * groups, software, mitigations, and data sources into CodeChunks,
  * then embeds and stores them in the VectorStore.
  *
- * Cache key: "secask" / "attack" / ATTACK_CACHE_KEY
+ * Cache key: "threatlens" / "attack" / ATTACK_CACHE_KEY
  * FilePath convention: attack://technique/T1059.001, attack://group/G0016, etc.
  */
 
@@ -220,7 +220,7 @@ export async function indexAttack(
 	signal?: AbortSignal
 ): Promise<ConnectorResult> {
 	// 1. Check cache
-	const cached = await store.loadFromCache("secask", "attack", ATTACK_CACHE_KEY);
+	const cached = await store.loadFromCache("threatlens", "attack", ATTACK_CACHE_KEY);
 	if (cached) {
 		onProgress?.({
 			phase: "cached",
@@ -296,7 +296,7 @@ export async function indexAttack(
 	store.insert(embedded);
 
 	onProgress?.({ phase: "persisting", message: "Saving ATT&CK index…", current: 0, total: 1 });
-	await store.persist("secask", "attack", ATTACK_CACHE_KEY);
+	await store.persist("threatlens", "attack", ATTACK_CACHE_KEY);
 
 	onProgress?.({
 		phase: "done",

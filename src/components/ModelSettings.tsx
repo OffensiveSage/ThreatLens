@@ -226,7 +226,7 @@ export function ModelSettings() {
 						if (passkeySupported) {
 							await vault.setConfigWithPasskey(
 								{ apiKey: apiKeyInput.trim(), provider: config.provider },
-								{ rpName: "GitAsk", userName: "user" }
+								{ rpName: "ThreatLens", userName: "user" }
 							);
 						} else if (passphraseInput.length >= 8) {
 							await vault.setConfig(

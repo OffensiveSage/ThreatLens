@@ -4,11 +4,11 @@
  * Security Domain Chat Page
  *
  * Handles all 5 security connectors:
- *   /secask/attack  → MITRE ATT&CK
- *   /secask/sigma   → Sigma Rules
- *   /secask/nvd     → NVD / CVEs
- *   /secask/nist    → NIST 800-53
- *   /secask/custom  → Custom Upload
+ *   /threatlens/attack  → MITRE ATT&CK
+ *   /threatlens/sigma   → Sigma Rules
+ *   /threatlens/nvd     → NVD / CVEs
+ *   /threatlens/nist    → NIST 800-53
+ *   /threatlens/custom  → Custom Upload
  *
  * Pattern mirrors [owner]/[repo]/page.tsx:
  *   1. Load from cache OR run connector indexer
@@ -407,7 +407,7 @@ function MessageBubble({
 						color: "var(--ink-light)",
 					}}
 				>
-					{isUser ? "you" : "✦ secask"}
+					{isUser ? "you" : "✦ threatlens"}
 				</span>
 				{!isUser && usedMode && (
 					<span style={{
@@ -768,7 +768,7 @@ export default function SecurityDomainPage({
 		setIsIndexed(false);
 		storeRef.current.clear();
 		if (domain !== "custom") {
-			await storeRef.current.clearCache("secask", domain);
+			await storeRef.current.clearCache("threatlens", domain);
 		}
 		setReindexKey((k) => k + 1);
 	}, [domain]);
@@ -839,7 +839,7 @@ export default function SecurityDomainPage({
 			`Delete stored index for ${meta.label}? You will be returned to the home page.`
 		);
 		if (!confirmed) return;
-		await storeRef.current.clearCache("secask", domain);
+		await storeRef.current.clearCache("threatlens", domain);
 		storeRef.current.clear();
 		if (chatStorageKey) {
 			try { localStorage.removeItem(chatStorageKey); } catch { /* ignore */ }
@@ -1258,7 +1258,7 @@ export default function SecurityDomainPage({
 							padding: 0,
 						}}
 					>
-						SecAsk
+						ThreatLens
 					</button>
 					<span style={{ color: "var(--ink-light)" }}>/</span>
 					<span className={`tag ${meta.tagClass}${indexJustCompleted ? " index-complete-flash" : ""}`}>

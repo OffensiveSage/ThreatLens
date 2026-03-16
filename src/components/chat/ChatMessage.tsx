@@ -166,7 +166,7 @@ export const ChatMessage = memo(function ChatMessage({
 				) : (
 					<>
 						{isStreaming && !showThinking && <span className="chat-live-dot" aria-hidden="true" />}
-						<span>✦ secask</span>
+						<span>✦ threatlens</span>
 					</>
 				)}
 			</div>

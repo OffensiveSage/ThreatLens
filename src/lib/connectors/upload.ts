@@ -5,7 +5,7 @@
  * (TXT/MD natively, JSON/YAML as formatted text, PDF via pdfjs-dist),
  * splits into overlapping chunks, embeds, and stores in the VectorStore.
  *
- * Cache key: "secask" / "custom" / content-fingerprint
+ * Cache key: "threatlens" / "custom" / content-fingerprint
  * FilePath convention: custom://{filename}::chunk_{n}
  */
 
@@ -190,7 +190,7 @@ export async function indexUpload(
 	const cacheKey = await fingerprintFiles(files);
 
 	// 1. Check cache
-	const cached = await store.loadFromCache("secask", "custom", cacheKey);
+	const cached = await store.loadFromCache("threatlens", "custom", cacheKey);
 	if (cached) {
 		onProgress?.({
 			phase: "cached",
@@ -278,7 +278,7 @@ export async function indexUpload(
 	store.insert(embedded);
 
 	onProgress?.({ phase: "persisting", message: "Saving upload index…", current: 0, total: 1 });
-	await store.persist("secask", "custom", cacheKey);
+	await store.persist("threatlens", "custom", cacheKey);
 
 	onProgress?.({
 		phase: "done",
