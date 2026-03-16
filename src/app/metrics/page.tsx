@@ -340,7 +340,7 @@ export default function MetricsPage() {
         </div>
 
         <footer style={styles.footer}>
-          <span>gitask</span>
+          <span>threatlens</span>
           <span style={styles.footerSep}>·</span>
           <span>compute metrics</span>
           <span style={styles.footerSep}>·</span>

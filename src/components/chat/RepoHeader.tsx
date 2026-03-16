@@ -5,7 +5,7 @@ import { ModelSettings } from "@/components/ModelSettings";
 import { getLLMConfig, type LLMStatus } from "@/lib/llm";
 import type { Message } from "@/app/[owner]/[repo]/types";
 
-const PROJECT_REPO_URL = "https://github.com/FloareDor/gitask";
+const PROJECT_REPO_URL = "https://github.com/OffensiveSage/ThreatLens";
 
 const overflowItemStyle: React.CSSProperties = {
 	fontSize: "13px",

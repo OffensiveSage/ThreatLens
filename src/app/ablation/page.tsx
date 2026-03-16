@@ -119,7 +119,7 @@ export default function AblationPage() {
         </section>
 
         <footer style={styles.footer}>
-          <span>gitask</span>
+          <span>threatlens</span>
           <span style={styles.footerSep}>·</span>
           <span>{ABLATION_RESULTS.length} configs</span>
           <span style={styles.footerSep}>·</span>
