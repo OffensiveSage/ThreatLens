@@ -1,0 +1,293 @@
+/**
+ * Graph Extractor — extracts static dependencies (imports) and definitions (exports/declarations)
+ * from source code using Tree-sitter ASTs.
+ */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Tree = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SyntaxNode = any;
+
+export interface FileDependencies {
+	imports: string[];
+	definitions: string[];
+}
+
+export interface FileSymbol {
+	name: string;
+	kind: string;
+	line: number;
+}
+
+/** Recursively find the identifier name through C/C++ declarator chains. */
+function findNameInDeclarator(node: SyntaxNode): string | null {
+	for (const child of node.children ?? []) {
+		if (child.type === "identifier" || child.type === "type_identifier") return child.text as string;
+		if (
+			child.type === "function_declarator" ||
+			child.type === "pointer_declarator" ||
+			child.type === "reference_declarator"
+		) {
+			const found = findNameInDeclarator(child);
+			if (found) return found;
+		}
+	}
+	return null;
+}
+
+/**
+ * Collect dependency/definition metadata for a single AST node.
+ * Optional symbol collection can be enabled by passing `symbols`.
+ */
+export function collectGraphMetadataFromNode(
+	node: SyntaxNode,
+	language: string,
+	imports: Set<string>,
+	definitions: Set<string>,
+	symbols?: FileSymbol[]
+): void {
+	// Language-specific dependency/definition extraction
+	switch (language) {
+		case "javascript":
+		case "typescript":
+		case "tsx":
+			extractJsTs(node, imports, definitions);
+			break;
+		case "python":
+			extractPython(node, imports, definitions);
+			break;
+		case "go":
+			extractGo(node, imports, definitions);
+			break;
+		case "rust":
+			extractRust(node, imports, definitions);
+			break;
+		case "c":
+		case "cpp":
+			extractCpp(node, imports, definitions);
+			break;
+	}
+
+	if (!symbols) return;
+
+	let kind = "";
+	switch (node.type) {
+		case "function_declaration":
+		case "function_definition":   // Python, C/C++
+		case "function_item":         // Rust
+			kind = "function"; break;
+		case "method_definition":     // JS/TS
+		case "method_declaration":    // Java, Go
+		case "constructor_declaration": // Java
+			kind = "method"; break;
+		case "class_declaration":     // JS/TS, Java
+		case "class_definition":      // Python
+		case "class_specifier":       // C++
+			kind = "class"; break;
+		case "struct_item":           // Rust
+		case "struct_specifier":      // C/C++
+			kind = "struct"; break;
+		case "enum_item":             // Rust
+			kind = "enum"; break;
+		case "impl_item":             // Rust
+			kind = "impl"; break;
+		case "interface_declaration": // Java/TS
+			kind = "interface"; break;
+		case "type_declaration":      // Go
+			kind = "type"; break;
+	}
+
+	if (!kind) return;
+
+	// Name resolution — different languages put the name in different places.
+	let nameText: string | undefined;
+
+	if (node.type === "type_declaration") {
+		// Go: type_declaration → type_spec → type_identifier
+		const spec = node.children.find((c: SyntaxNode) => c.type === "type_spec");
+		nameText = spec?.children.find((c: SyntaxNode) => c.type === "type_identifier")?.text;
+	} else {
+		// Direct name child — covers most languages
+		nameText = node.children.find(
+			(c: SyntaxNode) =>
+				c.type === "identifier" ||
+				c.type === "type_identifier" ||
+				c.type === "property_identifier" || // JS/TS methods
+				c.type === "field_identifier" ||     // Go methods
+				c.type === "name"
+		)?.text;
+
+		// C/C++: name nested inside declarator chain
+		if (!nameText) {
+			const decl = node.children.find(
+				(c: SyntaxNode) =>
+					c.type === "function_declarator" ||
+					c.type === "pointer_declarator" ||
+					c.type === "reference_declarator"
+			);
+			if (decl) nameText = findNameInDeclarator(decl) ?? undefined;
+		}
+	}
+
+	if (!nameText) return;
+	symbols.push({
+		name: nameText,
+		kind,
+		line: node.startPosition.row + 1,
+	});
+}
+
+/**
+ * Extract dependencies and definitions from a Tree-sitter tree.
+ */
+export function extractDependencies(tree: Tree, language: string): FileDependencies {
+	const imports: Set<string> = new Set();
+	const definitions: Set<string> = new Set();
+
+	const cursor = tree.walk();
+	visit(cursor, language, imports, definitions);
+
+	return {
+		imports: Array.from(imports),
+		definitions: Array.from(definitions),
+	};
+}
+
+/**
+ * Extract symbols (functions, classes, etc.) with location data.
+ */
+export function extractSymbolsFromTree(tree: Tree, language: string): FileSymbol[] {
+	const symbols: FileSymbol[] = [];
+	const cursor = tree.walk();
+
+	visitSymbols(cursor, language, symbols);
+
+	return symbols;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function visit(cursor: any, language: string, imports: Set<string>, definitions: Set<string>) {
+	const node: SyntaxNode = cursor.currentNode;
+	collectGraphMetadataFromNode(node, language, imports, definitions);
+
+	// Recurse
+	if (cursor.gotoFirstChild()) {
+		do {
+			visit(cursor, language, imports, definitions);
+		} while (cursor.gotoNextSibling());
+		cursor.gotoParent();
+	}
+}
+
+function extractJsTs(node: SyntaxNode, imports: Set<string>, definitions: Set<string>) {
+	if (node.type === "import_statement") {
+		// import ... from "source"
+		const source = node.children.find((c: SyntaxNode) => c.type === "string");
+		if (source?.text) imports.add(stripQuotes(source.text));
+	} else if (node.type === "export_statement") {
+		// export ... from "source"
+		const source = node.children.find((c: SyntaxNode) => c.type === "string");
+		if (source?.text) imports.add(stripQuotes(source.text));
+	} else if (node.type === "call_expression") {
+		// require("source")
+		if (node.text.startsWith("require(")) { // simple check
+			const args = node.children.find((c: SyntaxNode) => c.type === "arguments");
+			if (args) {
+				const source = args.children.find((c: SyntaxNode) => c.type === "string");
+				if (source?.text) imports.add(stripQuotes(source.text));
+			}
+		}
+	} else if (
+		node.type === "function_declaration" ||
+		node.type === "class_declaration" ||
+		node.type === "variable_declarator" // const x = ...
+	) {
+		const nameNode = node.children.find((c: SyntaxNode) => c.type === "identifier");
+		if (nameNode?.text) definitions.add(nameNode.text);
+	}
+}
+
+function extractPython(node: SyntaxNode, imports: Set<string>, definitions: Set<string>) {
+	if (node.type === "import_statement") {
+		// import x
+		// Check 'dotted_name' or 'aliased_import'
+		node.children.forEach((c: SyntaxNode) => {
+			if (c.type === "dotted_name") imports.add(c.text);
+			else if (c.type === "aliased_import") {
+				const name = c.children.find((child: SyntaxNode) => child.type === "dotted_name");
+				if (name?.text) imports.add(name.text);
+			}
+		});
+	} else if (node.type === "import_from_statement") {
+		// from x import y
+		const moduleName = node.children.find((c: SyntaxNode) => c.type === "dotted_name" || c.type === "relative_import");
+		if (moduleName?.text) imports.add(moduleName.text);
+	} else if (node.type === "function_definition" || node.type === "class_definition") {
+		const nameNode = node.children.find((c: SyntaxNode) => c.type === "identifier");
+		if (nameNode?.text) definitions.add(nameNode.text);
+	}
+}
+
+function extractGo(node: SyntaxNode, imports: Set<string>, definitions: Set<string>) {
+	if (node.type === "import_spec") {
+		const path = node.children.find((c: SyntaxNode) => c.type === "interpreted_string_literal");
+		if (path?.text) imports.add(stripQuotes(path.text));
+	} else if (node.type === "function_declaration" || node.type === "type_declaration") {
+		const nameNode = node.children.find((c: SyntaxNode) => c.type === "identifier");
+		if (nameNode?.text) definitions.add(nameNode.text);
+	}
+}
+
+function extractRust(node: SyntaxNode, imports: Set<string>, definitions: Set<string>) {
+	if (node.type === "use_declaration") {
+		// Simplification: just capture the whole text of the path
+		// use std::io; -> std::io
+		// tree-sitter-rust structure is complex, text fallback is okay for now
+		imports.add(node.text.replace(/^use\s+|;/g, "").trim());
+	} else if (node.type === "function_item" || node.type === "struct_item" || node.type === "enum_item") {
+		const nameNode = node.children.find((c: SyntaxNode) => c.type === "identifier" || c.type === "type_identifier");
+		if (nameNode?.text) definitions.add(nameNode.text);
+	}
+}
+
+function extractCpp(node: SyntaxNode, imports: Set<string>, definitions: Set<string>) {
+	if (node.type === "preproc_include") {
+		const path = node.children.find((c: SyntaxNode) => c.type === "string_literal" || c.type === "system_lib_string");
+		if (path?.text) imports.add(stripQuotes(path.text, true));
+	} else if (node.type === "function_definition" || node.type === "class_specifier") {
+		// Declarators are nested in C++, this is a "best effort" top-level check
+		const declarator = node.children.find((c: SyntaxNode) => c.type === "function_declarator");
+		if (declarator) {
+			const name = declarator.children.find((c: SyntaxNode) => c.type === "identifier");
+			if (name?.text) definitions.add(name.text);
+		}
+	}
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function visitSymbols(cursor: any, language: string, symbols: FileSymbol[]) {
+	const node: SyntaxNode = cursor.currentNode;
+	const imports = new Set<string>();
+	const definitions = new Set<string>();
+	collectGraphMetadataFromNode(node, language, imports, definitions, symbols);
+
+	if (cursor.gotoFirstChild()) {
+		do {
+			visitSymbols(cursor, language, symbols);
+		} while (cursor.gotoNextSibling());
+		cursor.gotoParent();
+	}
+}
+
+function stripQuotes(str: string, includeBrackets = false): string {
+	if (str.length < 2) return str;
+	const first = str[0];
+	const last = str[str.length - 1];
+	if ((first === '"' && last === '"') || (first === "'" && last === "'") || (first === '`' && last === '`')) {
+		return str.slice(1, -1);
+	}
+	if (includeBrackets && first === '<' && last === '>') {
+		return str.slice(1, -1);
+	}
+	return str;
+}

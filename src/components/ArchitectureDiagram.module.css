@@ -1,0 +1,553 @@
+/* ── Root ──────────────────────────────────────────────────────────────── */
+.root {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+/* ── Phase block ───────────────────────────────────────────────────────── */
+.phaseBlock {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.phaseLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+
+.phasePill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  border-radius: 2px;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45);
+  flex-shrink: 0;
+}
+
+/* ── Phase bridge (between ingestion & query) ──────────────────────────── */
+.phaseBridge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  margin: 6px 0 12px;
+}
+
+.bridgeLabel {
+  font-size: 0.58rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+/* ── Ingestion row (horizontal) ────────────────────────────────────────── */
+.ingestRow {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  justify-content: flex-start;
+  overflow-x: auto;
+  padding: 4px 16px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) transparent;
+}
+
+.ingestRow::-webkit-scrollbar {
+  height: 6px;
+}
+
+.ingestRow::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.ingestRow::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ingestShell {
+  position: relative;
+  width: 100%;
+}
+
+.ingestFade {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: calc(100% - 8px);
+  width: 64px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), var(--bg-card));
+  pointer-events: none;
+}
+
+.ingestCue {
+  position: absolute;
+  right: 14px;
+  top: -14px;
+  font-size: 0.62rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 2px 6px;
+  pointer-events: none;
+}
+
+.ingestItem {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Compact card sizing for ingestion */
+.ingestItem .card {
+  min-width: 108px;
+  max-width: 128px;
+  min-height: 80px;
+}
+
+/* ── Node fade-in ──────────────────────────────────────────────────────── */
+.node {
+  position: relative;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 300ms ease, transform 300ms ease;
+}
+
+.nodeVisible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.nodeSelected {
+  z-index: 1100;
+}
+
+/* ── Card ──────────────────────────────────────────────────────────────── */
+.card {
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-card);
+  box-shadow: 3px 3px 0 var(--accent);
+  padding: 10px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, border-color 0.1s ease;
+  cursor: default;
+}
+
+.card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--accent);
+  border-color: var(--border-accent);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  flex-wrap: wrap;
+}
+
+.phase {
+  font-size: 0.59rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.dbBadge {
+  font-size: 0.54rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 0 4px;
+  background: var(--bg-secondary);
+  white-space: nowrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+}
+
+.detail {
+  margin: 4px 0 0;
+  font-size: 0.71rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+/* ── Arrow SVGs ────────────────────────────────────────────────────────── */
+.hArrow {
+  width: 40px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.vArrow {
+  width: 16px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+/* ── Fork / Merge SVGs ─────────────────────────────────────────────────── */
+.forkSvg {
+  width: 280px;
+  height: 56px;
+  max-width: 100%;
+}
+
+.mergeSvg {
+  width: 280px;
+  height: 56px;
+  max-width: 100%;
+}
+
+/* ── Query flow (vertical, centered) ───────────────────────────────────── */
+.queryFlow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.queryItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Wider card for query phase */
+.queryFlow .card {
+  min-width: 260px;
+  max-width: 340px;
+}
+
+/* ── Branch row ────────────────────────────────────────────────────────── */
+.branchRow {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.branchRow .card {
+  min-width: 170px;
+  max-width: 210px;
+}
+
+/* ── Mobile ────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .ingestRow {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 4px 12px 10px;
+  }
+
+  .ingestItem {
+    flex-direction: row;
+  }
+
+  .ingestItem .card {
+    min-width: 112px;
+    max-width: 126px;
+  }
+
+  .queryFlow .card {
+    min-width: 200px;
+  }
+
+  .branchRow .card {
+    min-width: 140px;
+    max-width: 160px;
+  }
+
+  .forkSvg,
+  .mergeSvg {
+    width: 220px;
+  }
+
+  .ingestFade {
+    width: 52px;
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .node,
+  .nodeVisible,
+  .card {
+    transition: none;
+    transform: none;
+    animation: none;
+  }
+}
+
+/* ── Clickable card states ─────────────────────────────────────────────── */
+.cardClickable {
+  cursor: pointer;
+}
+
+.cardSelected {
+  border-color: var(--accent) !important;
+  box-shadow: 5px 5px 0 var(--accent) !important;
+  transform: translate(-2px, -2px) !important;
+}
+
+.codeHint {
+  font-size: 0.54rem;
+  font-family: var(--font-mono);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  padding: 0 3px;
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+/* ── Backdrop (transparent click-away) ─────────────────────────────────── */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* ── Code panel — floating popover beside the card ─────────────────────── */
+.codePanel {
+  position: fixed;
+  z-index: 100;
+  box-sizing: border-box;
+  max-height: 520px;
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 4px 4px 0 var(--accent), 0 12px 40px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: none;
+}
+
+.codePanelAttached {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 12px);
+  transform: translateY(-50%);
+  z-index: 1000;
+}
+
+.codePanelAttachedBottom {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+}
+
+.codePanelAttachedTop {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+}
+
+.codePanelCentered {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+  pointer-events: auto;
+}
+
+.modalFrame {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 12px 12px calc(14px + env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+@keyframes popoverIn {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.codePanelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 12px 14px 10px;
+  border-bottom: 2px solid var(--border);
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.codePanelHeaderInner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.codePanelTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+}
+
+.codePanelFilePath {
+  margin: 0;
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.closeBtn {
+  background: none;
+  border: 2px solid var(--border);
+  border-radius: 2px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 1.06rem;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: border-color 0.1s, box-shadow 0.1s, transform 0.1s;
+}
+
+.closeBtn:hover {
+  border-color: var(--accent);
+  box-shadow: 2px 2px 0 var(--accent);
+  transform: translate(-1px, -1px);
+}
+
+.codeBody {
+  overflow-y: auto;
+  flex: 1;
+  padding: 12px 14px 16px;
+  scrollbar-width: thin;
+}
+
+@media (max-width: 640px) {
+  .codePanelTitle {
+    font-size: 0.82rem;
+  }
+
+  .codePanelFilePath {
+    font-size: 0.62rem;
+  }
+}
+
+.noSnippet {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+/* ── Mobile: bottom sheet ──────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .backdrop {
+    background: rgba(0, 0, 0, 0.3);
+    animation: fadeIn 0.15s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .codePanel {
+    top: auto !important;
+    left: 0 !important;
+    bottom: 0;
+    width: 100vw !important;
+    max-height: 65vh;
+    border-radius: 4px 4px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    box-shadow: 0 -4px 0 var(--accent), 0 -12px 40px rgba(0, 0, 0, 0.3);
+    animation: slideInUp 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .codePanelAttached {
+    top: auto;
+    left: 0;
+    transform: none;
+    z-index: 100;
+  }
+
+  .codePanelAttachedBottom {
+    top: auto;
+    left: 0;
+    transform: none;
+    z-index: 100;
+  }
+
+  .codePanelAttachedTop {
+    bottom: auto;
+    left: 0;
+    transform: none;
+    z-index: 100;
+  }
+
+  @keyframes slideInUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .codePanel,
+  .backdrop {
+    animation: none;
+  }
+}

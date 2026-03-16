@@ -1,0 +1,807 @@
+/**
+ * Indexing Orchestrator —” ties the full RAG pipeline together.
+ *
+ * indexRepository() → fetch tree → chunk (AST) → embed (WebGPU)
+ * → store in VectorStore → persist to IndexedDB.
+ */
+
+import {
+	compareCommits,
+	fetchRepoTree,
+	fetchFileContent,
+	isIndexable,
+	prioritiseFiles,
+} from "./github";
+import { recordIndex } from "./metrics";
+import { chunkCode, chunkFromTree, type CodeChunk } from "./chunker";
+import { CHUNKING_LIMITS, detectLanguage } from "./chunker";
+import { embedChunks, initEmbedder, getDetectedWebGPUAvailability, getEmbedderDevice, resolveEmbedConfig, type EmbeddedChunk } from "./embedder";
+import { VectorStore } from "./vectorStore";
+import { collectGraphMetadataFromNode } from "./graph";
+import { formatWebGPUReason } from "./webgpu";
+import {
+	createDirectorySummaryChunks,
+	updateDirectoryStats,
+	type DirectoryStatsMap,
+} from "./directorySummary";
+
+export interface AstNode {
+	filePath: string;
+	name: string;
+	kind: string;
+	status: "pending" | "parsed" | "embedding" | "done";
+}
+
+export type IndexProgress = {
+	phase: "fetching" | "chunking" | "embedding" | "persisting" | "done" | "cached";
+	message: string;
+	current: number;
+	total: number;
+	astNodes?: AstNode[];
+	textChunkCounts?: Record<string, number>;
+	/** Approx storage size in bytes (IndexedDB) */
+	estimatedSizeBytes?: number;
+};
+
+export interface IndexResult {
+	sha: string;
+	fromCache: boolean;
+	treeTruncated: boolean;
+	indexedFiles: number;
+}
+
+/** Estimate IndexedDB storage: 384-dim embeddings + metadata per chunk */
+function estimateStorageBytes(chunkCount: number): number {
+	const EMBEDDING_DIM = 384;
+	const BYTES_PER_FLOAT = 8;
+	const METADATA_PER_CHUNK = 1500;
+	return chunkCount * (EMBEDDING_DIM * BYTES_PER_FLOAT + METADATA_PER_CHUNK);
+}
+
+/** Thrown when indexing is aborted via AbortSignal */
+export class IndexAbortError extends Error {
+	constructor() {
+		super("Indexing aborted");
+		this.name = "IndexAbortError";
+	}
+}
+
+function checkAborted(signal?: AbortSignal): void {
+	if (signal?.aborted) throw new IndexAbortError();
+}
+
+const DIRECTORY_SUMMARY_LIMITS = {
+	maxFilesPerDir: 120,
+	maxCharsPerDir: 400_000,
+	maxSummaryChars: CHUNKING_LIMITS.MAX_CHUNK_CHARS,
+} as const;
+
+const AST_CHUNK_LANGUAGES = new Set([
+	"javascript",
+	"typescript",
+	"tsx",
+	"python",
+	"rust",
+	"go",
+	"java",
+	"c",
+	"cpp",
+]);
+
+function buildEmbeddingFallbackMessage(workerCount: number): string {
+	const availability = getDetectedWebGPUAvailability();
+	const reason = availability
+		? ` ${formatWebGPUReason(availability.reason, availability.error)}`
+		: "";
+	const workerNote =
+		workerCount > 1 ? ` Using ${workerCount} parallel workers.` : "";
+	return `Using CPU (WASM) for embeddings.${reason} Embedding will be slower.${workerNote}`;
+}
+
+function resolveChunkWorkerCount(totalPendingFiles: number, hasToken: boolean): number {
+	if (totalPendingFiles <= 1) return 1;
+	const cores =
+		typeof navigator !== "undefined" && Number.isFinite(navigator.hardwareConcurrency)
+			? navigator.hardwareConcurrency
+			: 4;
+	const target = Math.max(2, Math.floor(cores / 2));
+	const cap = hasToken ? 8 : 4;
+	return Math.max(1, Math.min(totalPendingFiles, Math.min(target, cap)));
+}
+
+/**
+ * Index an entire repository.
+ * Emits progress events via the callback.
+ * Supports cancellation via optional AbortSignal.
+ */
+export async function indexRepository(
+	owner: string,
+	repo: string,
+	store: VectorStore,
+	onProgress?: (progress: IndexProgress) => void,
+	token?: string,
+	signal?: AbortSignal
+): Promise<IndexResult> {
+	checkAborted(signal);
+
+	const indexStartTime = performance.now();
+
+	// 1. Fetch tree
+	onProgress?.({
+		phase: "fetching",
+		message: "Fetching repository structure—¦",
+		current: 0,
+		total: 1,
+	});
+
+	const tree = await fetchRepoTree(owner, repo, token);
+	checkAborted(signal);
+
+	// Fail fast on truncated trees to avoid stale/partial context from incomplete repository views.
+	if (tree.truncated) {
+		throw new Error(
+			"Repository tree is truncated by GitHub API. Indexing stopped to avoid partial context. Add a GitHub token with repo read access and retry."
+		);
+	}
+
+	// 1.5 Init Tree-Sitter (dynamic import to avoid bundling fs/promises)
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	let Parser: any = null;
+	try {
+		const mod = await import("web-tree-sitter");
+		Parser = mod.Parser ?? mod.default;
+		if (Parser?.init) {
+			await Parser.init({
+				locateFile(scriptName: string) {
+					return "/" + scriptName;
+				},
+			});
+		}
+	} catch (e) {
+		console.warn("Failed to init tree-sitter:", e);
+		onProgress?.({
+			phase: "fetching",
+			message: "AST parsing unavailable —” falling back to text chunking. Search quality may be reduced.",
+			current: 0,
+			total: 1,
+		});
+	}
+
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const parsers: Record<string, any> = {};
+
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const parserLoaders: Record<string, Promise<any>> = {};
+
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const getParserForLanguage = async (lang: string): Promise<any> => {
+		if (parsers[lang]) return parsers[lang];
+		if (!Parser) return null;
+		if (!parserLoaders[lang]) {
+			parserLoaders[lang] = (async () => {
+				const wasmPath = `/wasms/tree-sitter-${lang}.wasm`;
+				const language = await Parser.Language.load(wasmPath);
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				const parser = new (Parser as any)();
+				parser.setLanguage(language);
+				return parser;
+			})();
+		}
+		parsers[lang] = await parserLoaders[lang];
+		return parsers[lang];
+	};
+
+	type ChunkingResult = {
+		fileIndex: number;
+		filePath: string;
+		contentLength: number;
+		chunks: CodeChunk[];
+		deps?: { imports: string[]; definitions: string[] };
+		symbolNodes: AstNode[];
+		error?: unknown;
+	};
+
+	const processFileForChunking = async (
+		file: { path: string },
+		fileIndex: number
+	): Promise<ChunkingResult> => {
+		checkAborted(signal);
+		try {
+			// Fetch each file from the exact commit snapshot resolved during tree fetch.
+			const content = await fetchFileContent(owner, repo, file.path, token, tree.sha);
+			checkAborted(signal);
+			const lang = detectLanguage(file.path);
+			let chunks: CodeChunk[] = [];
+			let deps: { imports: string[]; definitions: string[] } | undefined;
+			let symbolNodes: AstNode[] = [];
+
+			// Attempt to use AST chunking if possible.
+			if (Parser && lang && AST_CHUNK_LANGUAGES.has(lang)) {
+				try {
+					const parser = await getParserForLanguage(lang);
+					const astTree = parser.parse(content);
+					try {
+						const imports = new Set<string>();
+						const definitions = new Set<string>();
+						const symbols: Array<{ name: string; kind: string; line: number }> = [];
+						chunks = chunkFromTree(file.path, content, astTree, lang, (node) => {
+							collectGraphMetadataFromNode(
+								node,
+								lang,
+								imports,
+								definitions,
+								symbols
+							);
+						});
+						deps = {
+							imports: Array.from(imports),
+							definitions: Array.from(definitions),
+						};
+						symbolNodes = symbols.map((sym) => ({
+							filePath: file.path,
+							name: sym.name,
+							kind: sym.kind,
+							status: "parsed",
+						}));
+					} finally {
+						astTree.delete();
+					}
+				} catch (e) {
+					console.warn(`Failed to AST chunk ${file.path}, falling back to text:`, e);
+					chunks = chunkCode(file.path, content);
+				}
+			} else {
+				chunks = chunkCode(file.path, content);
+			}
+
+			return {
+				fileIndex,
+				filePath: file.path,
+				contentLength: content.length,
+				chunks,
+				deps,
+				symbolNodes,
+			};
+		} catch (e) {
+			if (e instanceof IndexAbortError) throw e;
+			return {
+				fileIndex,
+				filePath: file.path,
+				contentLength: 0,
+				chunks: [],
+				symbolNodes: [],
+				error: e,
+			};
+		}
+	};
+
+	checkAborted(signal);
+
+	// 2. Check cache
+	const cached = await store.loadFromCache(owner, repo, tree.sha);
+	if (cached) {
+		// Derive AST nodes and chunk counts from cached chunks so the file tree is populated.
+		// Maps raw tree-sitter nodeType → friendly AstNode kind used by AstTreeView.
+		const NODE_TYPE_TO_KIND: Record<string, string> = {
+			function_declaration: "function", function: "function", arrow_function: "function",
+			function_definition: "function", function_item: "function",
+			method_definition: "method", method_declaration: "method", constructor_declaration: "method",
+			class_declaration: "class", class_definition: "class", class_specifier: "class",
+			struct_item: "struct", struct_specifier: "struct",
+			interface_declaration: "interface",
+			enum_item: "enum",
+			impl_item: "impl",
+			type_declaration: "type",
+			lexical_declaration: "constant", variable_declaration: "constant",
+		};
+		const derivedAstNodes: AstNode[] = [];
+		const derivedTextChunkCounts: Record<string, number> = {};
+		for (const chunk of store.getAll()) {
+			derivedTextChunkCounts[chunk.filePath] = (derivedTextChunkCounts[chunk.filePath] ?? 0) + 1;
+			const kind = NODE_TYPE_TO_KIND[chunk.nodeType];
+			if (kind && chunk.name && !chunk.name.startsWith("chunk_")) {
+				derivedAstNodes.push({ filePath: chunk.filePath, name: chunk.name, kind, status: "done" });
+			}
+		}
+		onProgress?.({
+			phase: "cached",
+			message: `Loaded ${store.size} chunks from cache`,
+			current: store.size,
+			total: store.size,
+			astNodes: derivedAstNodes,
+			textChunkCounts: derivedTextChunkCounts,
+		});
+		return {
+			sha: tree.sha,
+			fromCache: true,
+			treeTruncated: tree.truncated,
+			indexedFiles: tree.files.length,
+		};
+	}
+
+	// 2.5 Try incremental update (only changed files) when we have a previous index
+	const INCREMENTAL_CHANGED_FILES_LIMIT = 250;
+	let didIncremental = false;
+	const blob = await store.loadCachedBlob(owner, repo);
+	if (blob && blob.sha !== tree.sha) {
+		await store.clearPartialProgress(owner, repo);
+		try {
+			const compare = await compareCommits(owner, repo, blob.sha, tree.sha, token);
+			const KNOWN_STATUSES = new Set(["added", "removed", "modified", "renamed"]);
+			if (compare.files.length <= INCREMENTAL_CHANGED_FILES_LIMIT) {
+				const pathsToRemove = new Set<string>();
+				const pathsToAdd = new Set<string>();
+				for (const f of compare.files) {
+					if (!KNOWN_STATUSES.has(f.status)) continue;
+					if (f.status === "removed" && isIndexable(f.filename)) {
+						pathsToRemove.add(f.filename);
+					}
+					if (f.status === "modified" && isIndexable(f.filename)) {
+						pathsToRemove.add(f.filename);
+						pathsToAdd.add(f.filename);
+					}
+					if (f.status === "added" && isIndexable(f.filename)) {
+						pathsToAdd.add(f.filename);
+					}
+					if (f.status === "renamed") {
+						if (f.previous_filename && isIndexable(f.previous_filename)) {
+							pathsToRemove.add(f.previous_filename);
+						}
+						if (isIndexable(f.filename)) {
+							pathsToAdd.add(f.filename);
+						}
+					}
+				}
+				store.setFromBlob(blob);
+				store.removeChunksByFilePaths(pathsToRemove);
+
+				const filesToAdd = tree.files.filter((f) => pathsToAdd.has(f.path));
+				if (filesToAdd.length > 0) {
+					onProgress?.({
+						phase: "chunking",
+						message: `Chunking ${filesToAdd.length} changed files—¦`,
+						current: 0,
+						total: filesToAdd.length,
+					});
+					await initEmbedder((msg) =>
+						onProgress?.({
+							phase: "embedding",
+							message: msg,
+							current: 0,
+							total: filesToAdd.length,
+						})
+					);
+					const embedDevice = getEmbedderDevice() ?? "wasm";
+					const embedConfig = resolveEmbedConfig(embedDevice);
+					if (embedDevice === "wasm") {
+						onProgress?.({
+							phase: "embedding",
+							message: buildEmbeddingFallbackMessage(embedConfig.workerCount),
+							current: 0,
+							total: filesToAdd.length,
+						});
+					}
+					const chunkWorkerCount = resolveChunkWorkerCount(filesToAdd.length, Boolean(token));
+					const allNewChunks: CodeChunk[] = [];
+					const newDeps: Record<string, { imports: string[]; definitions: string[] }> = {};
+					for (let batchStart = 0; batchStart < filesToAdd.length; batchStart += chunkWorkerCount) {
+						checkAborted(signal);
+						const batch = filesToAdd.slice(batchStart, batchStart + chunkWorkerCount);
+						const batchResults = await Promise.all(
+							batch.map((file, offset) => processFileForChunking(file, batchStart + offset))
+						);
+						for (const result of batchResults) {
+							if (result.error) {
+								console.warn(`Skipped ${result.filePath} (incremental):`, result.error);
+							} else {
+								allNewChunks.push(...result.chunks);
+								if (result.deps) {
+									newDeps[result.filePath] = result.deps;
+								}
+							}
+						}
+						onProgress?.({
+							phase: "chunking",
+							message: `Chunked ${Math.min(batchStart + batch.length, filesToAdd.length)}/${filesToAdd.length} changed files`,
+							current: batchStart + batch.length,
+							total: filesToAdd.length,
+						});
+					}
+					if (allNewChunks.length > 0) {
+						onProgress?.({
+							phase: "embedding",
+							message: `Embedding ${allNewChunks.length} chunks—¦`,
+							current: 0,
+							total: allNewChunks.length,
+						});
+						const embeddedNew = await embedChunks(
+							allNewChunks,
+							(done, total) => {
+								onProgress?.({
+									phase: "embedding",
+									message: `Embedded ${done}/${total} new chunks`,
+									current: done,
+									total,
+								});
+							},
+							embedConfig.batchSize,
+							signal,
+							undefined,
+							embedConfig.workerCount
+						);
+						store.insert(embeddedNew);
+					}
+					const graph = store.getGraph();
+					for (const [path, deps] of Object.entries(newDeps)) {
+						graph[path] = deps;
+					}
+					store.setGraph(graph);
+				}
+
+				onProgress?.({
+					phase: "persisting",
+					message: "Saving to cache—¦",
+					current: 0,
+					total: 1,
+				});
+				await store.persist(owner, repo, tree.sha);
+				await store.clearPartialProgress(owner, repo);
+
+				const indexedCount = tree.files.filter((f) => isIndexable(f.path)).length;
+				recordIndex(
+					indexedCount,
+					store.size,
+					performance.now() - indexStartTime,
+					`${owner}/${repo}`
+				);
+				onProgress?.({
+					phase: "done",
+					message: `Incremental update: ${store.size} chunks (${filesToAdd.length} files updated)`,
+					current: store.size,
+					total: store.size,
+				});
+				didIncremental = true;
+				return {
+					sha: tree.sha,
+					fromCache: false,
+					treeTruncated: tree.truncated,
+					indexedFiles: indexedCount,
+				};
+			}
+		} catch (_e) {
+			// Fall through to full re-index
+		}
+	}
+
+	if (!didIncremental) {
+		store.clear();
+	}
+
+	// 3. Filter and prioritise files
+	const indexableFiles = prioritiseFiles(
+		tree.files.filter((f) => isIndexable(f.path))
+	);
+	const indexablePaths = indexableFiles.map((f) => f.path);
+	const totalFiles = indexableFiles.length;
+
+	// 4. Check for partial progress (tab-close resume)
+	const partial = await store.loadPartialProgress(owner, repo, tree.sha);
+	let allChunks: CodeChunk[];
+	let astNodes: AstNode[];
+	let textChunkCounts: Record<string, number>;
+	let fileChunkRanges: Map<string, { start: number; end: number }>;
+	let dependencyGraph: Record<string, { imports: string[]; definitions: string[] }>;
+	let directoryStats: DirectoryStatsMap;
+	let startFileIndex: number;
+
+	if (partial?.phase === "embedding" && partial.allChunks && partial.embeddedSoFar != null) {
+		// Resume embedding
+		allChunks = partial.allChunks;
+		astNodes = (partial.astNodes ?? []) as AstNode[];
+		textChunkCounts = partial.textChunkCounts ?? {};
+		fileChunkRanges = new Map(partial.fileChunkRanges ?? []);
+		dependencyGraph = partial.dependencyGraph ?? {};
+		directoryStats = partial.directoryStats ?? {};
+		startFileIndex = totalFiles; // Skip chunking
+	} else if (partial?.phase === "chunking" && partial.allChunks && partial.indexablePaths && partial.lastProcessedFileIndex != null) {
+		// Resume chunking
+		allChunks = partial.allChunks;
+		astNodes = (partial.astNodes ?? []) as AstNode[];
+		textChunkCounts = partial.textChunkCounts ?? {};
+		fileChunkRanges = new Map(partial.fileChunkRanges ?? []);
+		dependencyGraph = partial.dependencyGraph ?? {};
+		directoryStats = partial.directoryStats ?? {};
+		startFileIndex = partial.lastProcessedFileIndex + 1;
+	} else {
+		// Fresh start
+		allChunks = [];
+		astNodes = [];
+		textChunkCounts = {};
+		fileChunkRanges = new Map();
+		dependencyGraph = {};
+		directoryStats = {};
+		startFileIndex = 0;
+	}
+
+	const pendingChunkFiles = Math.max(0, totalFiles - startFileIndex);
+	const chunkWorkerCount = resolveChunkWorkerCount(pendingChunkFiles, Boolean(token));
+	const chunkCheckpointInterval = Math.max(4, chunkWorkerCount * 2);
+	if (startFileIndex < totalFiles) {
+		onProgress?.({
+			phase: "fetching",
+			message: `Fetching ${totalFiles} files—¦ (chunk workers: ${chunkWorkerCount})`,
+			current: startFileIndex,
+			total: totalFiles,
+		});
+		console.info(
+			`Index chunk workers: ${chunkWorkerCount} (pending files: ${pendingChunkFiles}, cores: ${typeof navigator !== "undefined" ? navigator.hardwareConcurrency : "n/a"})`
+		);
+	}
+
+	const skippedFiles: string[] = [];
+
+	// 5. Fetch + chunk files (or resume from startFileIndex) with bounded concurrency.
+	for (let batchStart = startFileIndex; batchStart < indexableFiles.length; batchStart += chunkWorkerCount) {
+		checkAborted(signal);
+		const batch = indexableFiles.slice(batchStart, batchStart + chunkWorkerCount);
+		const batchResults = await Promise.all(
+			batch.map((file, offset) => processFileForChunking(file, batchStart + offset))
+		);
+
+		let lastFileIndex = batchStart;
+		for (const result of batchResults) {
+			lastFileIndex = result.fileIndex;
+			if (result.error) {
+				console.warn(`Skipped ${result.filePath}:`, result.error);
+				skippedFiles.push(result.filePath);
+			} else {
+				const chunkStart = allChunks.length;
+				allChunks.push(...result.chunks);
+				const chunkEnd = allChunks.length;
+
+				fileChunkRanges.set(result.filePath, { start: chunkStart, end: chunkEnd });
+				textChunkCounts[result.filePath] = result.chunks.length;
+				if (result.deps) {
+					dependencyGraph[result.filePath] = result.deps;
+				}
+				if (result.symbolNodes.length > 0) {
+					astNodes.push(...result.symbolNodes);
+				}
+				updateDirectoryStats(
+					directoryStats,
+					result.filePath,
+					result.contentLength,
+					result.chunks.length,
+					result.chunks.some((chunk) => chunk.nodeType === "file_summary")
+				);
+			}
+		}
+
+		// Fire once per batch (not per file) to avoid spreading the growing
+		// astNodes array O(workers) times per batch.
+		onProgress?.({
+			phase: "chunking",
+			message: `Chunked ${lastFileIndex + 1}/${totalFiles} files (${allChunks.length} chunks, ${chunkWorkerCount} workers)`,
+			current: lastFileIndex + 1,
+			total: totalFiles,
+			astNodes: [...astNodes],
+			textChunkCounts: { ...textChunkCounts },
+		});
+
+		const lastProcessedFileIndex = batchStart + batch.length - 1;
+		const processedSinceResume = lastProcessedFileIndex - startFileIndex + 1;
+		const shouldCheckpoint =
+			lastProcessedFileIndex >= indexableFiles.length - 1 ||
+			processedSinceResume % chunkCheckpointInterval === 0;
+		if (shouldCheckpoint) {
+			checkAborted(signal);
+			await store.savePartialProgress(owner, repo, {
+				sha: tree.sha,
+				timestamp: Date.now(),
+				phase: "chunking",
+				indexablePaths,
+				allChunks: [...allChunks],
+				astNodes: [...astNodes],
+				textChunkCounts: { ...textChunkCounts },
+				fileChunkRanges: [...fileChunkRanges.entries()],
+				dependencyGraph: { ...dependencyGraph },
+				directoryStats: { ...directoryStats },
+				lastProcessedFileIndex,
+			});
+		}
+	}
+
+	checkAborted(signal);
+
+	const directorySummaryChunks = createDirectorySummaryChunks(
+		directoryStats,
+		DIRECTORY_SUMMARY_LIMITS
+	);
+	if (directorySummaryChunks.length > 0) {
+		allChunks.push(...directorySummaryChunks);
+	}
+
+	// 6. Embed chunks (or resume from embeddedSoFar)
+	const embeddedSoFar: EmbeddedChunk[] = partial?.phase === "embedding" && partial.embeddedSoFar
+		? partial.embeddedSoFar
+		: [];
+	const chunksToEmbed = allChunks.slice(embeddedSoFar.length);
+	const estimatedBytes = estimateStorageBytes(allChunks.length);
+
+	// Save embedding-phase partial before starting (for tab-close during embed)
+	await store.savePartialProgress(owner, repo, {
+		sha: tree.sha,
+		timestamp: Date.now(),
+		phase: "embedding",
+		allChunks: [...allChunks],
+		astNodes: [...astNodes],
+		textChunkCounts: { ...textChunkCounts },
+		fileChunkRanges: [...fileChunkRanges.entries()],
+		dependencyGraph: { ...dependencyGraph },
+		directoryStats: { ...directoryStats },
+		embeddedSoFar: [...embeddedSoFar],
+	});
+
+	onProgress?.({
+		phase: "embedding",
+		message: chunksToEmbed.length > 0 ? `Embedding ${allChunks.length} chunks—¦` : `Resuming embedding—¦`,
+		current: embeddedSoFar.length,
+		total: allChunks.length,
+		astNodes: [...astNodes],
+		textChunkCounts: { ...textChunkCounts },
+		estimatedSizeBytes: estimatedBytes,
+	});
+
+	await initEmbedder((msg) =>
+		onProgress?.({
+			phase: "embedding",
+			message: msg,
+			current: embeddedSoFar.length,
+			total: allChunks.length,
+			astNodes: [...astNodes],
+			textChunkCounts: { ...textChunkCounts },
+			estimatedSizeBytes: estimatedBytes,
+		})
+	);
+
+	const embedDevice = getEmbedderDevice() ?? "wasm";
+	const embedConfig = resolveEmbedConfig(embedDevice);
+	if (embedDevice === "wasm") {
+		onProgress?.({
+			phase: "embedding",
+			message: buildEmbeddingFallbackMessage(embedConfig.workerCount),
+			current: embeddedSoFar.length,
+			total: allChunks.length,
+			estimatedSizeBytes: estimatedBytes,
+		});
+	} else if (embedConfig.batchSize > 1) {
+		onProgress?.({
+			phase: "embedding",
+			message: `WebGPU detected —” using batch size ${embedConfig.batchSize} for fast embedding`,
+			current: embeddedSoFar.length,
+			total: allChunks.length,
+			estimatedSizeBytes: estimatedBytes,
+		});
+	}
+
+	let embedded: EmbeddedChunk[];
+	if (chunksToEmbed.length === 0) {
+		embedded = embeddedSoFar;
+	} else {
+		// Precompute a file→status map so each embedding-progress callback does
+		// O(files) work instead of O(nodes) repeated Map.get + range comparisons.
+		// Only update and re-spread astNodes at most every 250 ms to avoid GC
+		// pressure from thousands of object allocations per second on fast GPUs.
+		const fileStatusMap = new Map<string, AstNode["status"]>();
+		for (const [fp] of fileChunkRanges) fileStatusMap.set(fp, "parsed");
+		let lastProgressMs = 0;
+
+		const newlyEmbedded = await embedChunks(
+			chunksToEmbed,
+			(done, _total) => {
+				checkAborted(signal);
+				const overallDone = embeddedSoFar.length + done;
+				const now = performance.now();
+				const isLast = overallDone >= allChunks.length;
+
+				// Throttle UI updates; always fire on the final chunk.
+				if (!isLast && now - lastProgressMs < 250) return;
+				lastProgressMs = now;
+
+				// Update file-level statuses in O(files) rather than O(nodes).
+				for (const [fp, range] of fileChunkRanges) {
+					if (overallDone >= range.end) fileStatusMap.set(fp, "done");
+					else if (overallDone > range.start) fileStatusMap.set(fp, "embedding");
+					// else stays "parsed" —” no update needed
+				}
+
+				const updatedNodes = astNodes.map((node) => {
+					const status = fileStatusMap.get(node.filePath);
+					return status && status !== node.status ? { ...node, status } : node;
+				});
+
+				onProgress?.({
+					phase: "embedding",
+					message: `Embedded ${overallDone}/${allChunks.length} chunks`,
+					current: overallDone,
+					total: allChunks.length,
+					astNodes: updatedNodes,
+					textChunkCounts: { ...textChunkCounts },
+					estimatedSizeBytes: estimatedBytes,
+				});
+			},
+			embedConfig.batchSize,
+			signal,
+			(batchResults) => {
+				const soFar = [...embeddedSoFar, ...batchResults];
+				store.savePartialProgress(owner, repo, {
+					sha: tree.sha,
+					timestamp: Date.now(),
+					phase: "embedding",
+					allChunks: [...allChunks],
+					astNodes: [...astNodes],
+					textChunkCounts: { ...textChunkCounts },
+					fileChunkRanges: [...fileChunkRanges.entries()],
+					dependencyGraph: { ...dependencyGraph },
+					directoryStats: { ...directoryStats },
+					embeddedSoFar: soFar,
+				}).catch((e) => {
+					console.warn("Failed to save partial embedding progress:", e);
+					onProgress?.({
+						phase: "embedding",
+						message: "Warning: could not save progress checkpoint —” if you close this tab, indexing will restart from scratch.",
+						current: soFar.length,
+						total: allChunks.length,
+						estimatedSizeBytes: estimatedBytes,
+					});
+				});
+			},
+			embedConfig.workerCount
+		);
+		embedded = [...embeddedSoFar, ...newlyEmbedded];
+	}
+
+	// 7. Store
+	store.insert(embedded);
+	store.setGraph(dependencyGraph);
+
+	checkAborted(signal);
+
+	// 7. Persist to IndexedDB
+	onProgress?.({
+		phase: "persisting",
+		message: "Saving to cache—¦",
+		current: 0,
+		total: 1,
+		estimatedSizeBytes: estimatedBytes,
+	});
+
+	await store.persist(owner, repo, tree.sha);
+	await store.clearPartialProgress(owner, repo);
+
+	const skippedNote =
+		skippedFiles.length > 0
+			? ` —” ${skippedFiles.length} file${skippedFiles.length > 1 ? "s" : ""} could not be fetched`
+			: "";
+	onProgress?.({
+		phase: "done",
+		message: `Indexed ${embedded.length} chunks from ${totalFiles - skippedFiles.length} files${skippedNote}`,
+		current: embedded.length,
+		total: embedded.length,
+		estimatedSizeBytes: estimatedBytes,
+	});
+
+	recordIndex(
+		totalFiles - skippedFiles.length,
+		embedded.length,
+		performance.now() - indexStartTime,
+		`${owner}/${repo}`
+	);
+
+	return {
+		sha: tree.sha,
+		fromCache: false,
+		treeTruncated: tree.truncated,
+		indexedFiles: totalFiles,
+	};
+}

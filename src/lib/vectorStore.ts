@@ -1,0 +1,464 @@
+/**
+ * Vector Store — wraps EntityDB for indexing and searching code embeddings.
+ *
+ * Handles insert, search, persistence to IndexedDB, and cache invalidation.
+ */
+
+import { EMBEDDING_MODEL_ID, type EmbeddedChunk } from "./embedder";
+import type { CodeChunk } from "./chunker";
+import { binarize } from "./quantize";
+import type { GraphResolveFileData } from "./graphExpansion";
+
+type StoredRepoGraph = Record<string, { imports: string[]; definitions: string[] }>;
+
+interface CachedRepoBlob {
+	sha: string;
+	timestamp: number;
+	embeddingModel?: string;
+	chunks: EmbeddedChunk[];
+	graph?: StoredRepoGraph;
+}
+
+/** AST node for partial progress (matches indexer AstNode shape) */
+export interface PartialAstNode {
+	filePath: string;
+	name: string;
+	kind: string;
+	status: string;
+}
+
+/** Partial progress for tab-close resilience (chunking or embedding phase) */
+export interface PartialProgress {
+	sha: string;
+	timestamp: number;
+	embeddingModel?: string;
+	phase: "chunking" | "embedding";
+	indexablePaths?: string[];
+	allChunks?: CodeChunk[];
+	astNodes?: PartialAstNode[];
+	textChunkCounts?: Record<string, number>;
+	fileChunkRanges?: [string, { start: number; end: number }][];
+	dependencyGraph?: Record<string, { imports: string[]; definitions: string[] }>;
+	directoryStats?: Record<string, {
+		fileCount: number;
+		totalChars: number;
+		files: Array<{
+			path: string;
+			charCount: number;
+			chunkCount: number;
+			hasLargeFileSummary: boolean;
+		}>;
+	}>;
+	lastProcessedFileIndex?: number;
+	embeddedSoFar?: EmbeddedChunk[];
+}
+
+export interface SearchResult {
+	chunk: CodeChunk;
+	score: number;
+	embedding?: number[];
+}
+
+export function isCompatibleEmbeddingModel(embeddingModel: unknown): boolean {
+	return typeof embeddingModel === "string" && embeddingModel === EMBEDDING_MODEL_ID;
+}
+
+/**
+ * In-memory vector store backed by simple arrays.
+ * We use entity-db for persistence but manage search ourselves
+ * to support binary quantisation + Hamming distance.
+ */
+export class VectorStore {
+	private chunks: EmbeddedChunk[] = [];
+	private chunkBinaries: Uint32Array[] = [];
+	private chunksByFile: Map<string, EmbeddedChunk[]> = new Map();
+	private resolveFileDataCache: GraphResolveFileData | null = null;
+	private resolveFileDataDirty = true;
+	private graph: Record<string, { imports: string[]; definitions: string[] }> = {};
+	private repoKey: string = "";
+
+	constructor() { }
+
+	/**
+	 * Insert embedded chunks into the store.
+	 */
+	insert(chunks: EmbeddedChunk[]): void {
+		for (const chunk of chunks) {
+			const hadFile = this.chunksByFile.has(chunk.filePath);
+			this.chunks.push(chunk);
+			this.chunkBinaries.push(binarize(chunk.embedding));
+			const fileChunks = this.chunksByFile.get(chunk.filePath) || [];
+			fileChunks.push(chunk);
+			this.chunksByFile.set(chunk.filePath, fileChunks);
+			if (!hadFile) this.resolveFileDataDirty = true;
+		}
+	}
+
+	/**
+	 * Set the dependency graph.
+	 */
+	setGraph(graph: Record<string, { imports: string[]; definitions: string[] }>): void {
+		this.graph = graph;
+	}
+
+	/**
+	 * Get the dependency graph.
+	 */
+	getGraph(): Record<string, { imports: string[]; definitions: string[] }> {
+		return this.graph;
+	}
+
+	/**
+	 * Get all stored chunks.
+	 */
+	getAll(): EmbeddedChunk[] {
+		return this.chunks;
+	}
+
+	/**
+	 * Get precomputed binary embeddings aligned with getAll() order.
+	 */
+	getAllBinaries(): Uint32Array[] {
+		return this.chunkBinaries;
+	}
+
+	/**
+	 * Cached file path indexes used by graph expansion import resolution.
+	 */
+	getResolveFileData(): GraphResolveFileData {
+		if (!this.resolveFileDataDirty && this.resolveFileDataCache) {
+			return this.resolveFileDataCache;
+		}
+
+		const allFiles = [...this.chunksByFile.keys()];
+		const normalizedFiles = allFiles.map((p) => p.replace(/\\/g, "/"));
+		const exactIndex = new Map<string, number>();
+		for (let i = 0; i < normalizedFiles.length; i++) {
+			exactIndex.set(normalizedFiles[i], i);
+		}
+
+		this.resolveFileDataCache = {
+			allFiles,
+			normalizedFiles,
+			exactIndex,
+		};
+		this.resolveFileDataDirty = false;
+		return this.resolveFileDataCache;
+	}
+
+	getChunksByFile(filePath: string): EmbeddedChunk[] {
+		return this.chunksByFile.get(filePath) || [];
+	}
+
+	/**
+	 * Get the number of chunks stored.
+	 */
+	get size(): number {
+		return this.chunks.length;
+	}
+
+	/**
+	 * Clear the store.
+	 */
+	clear(): void {
+		this.chunks = [];
+		this.chunkBinaries = [];
+		this.chunksByFile.clear();
+		this.resolveFileDataCache = null;
+		this.resolveFileDataDirty = true;
+		this.graph = {};
+	}
+
+	/**
+	 * Load the cached blob from IndexedDB without requiring SHA match.
+	 * Used for incremental indexing to get lastSha and existing chunks.
+	 * Does not modify in-memory store.
+	 */
+	async loadCachedBlob(
+		owner: string,
+		repo: string
+	): Promise<{ sha: string; chunks: EmbeddedChunk[]; graph: StoredRepoGraph } | null> {
+		const key = `${owner}/${repo}`;
+		return new Promise((resolve) => {
+			const request = indexedDB.open("gitask-cache", 1);
+			request.onupgradeneeded = () => {
+				const db = request.result;
+				if (!db.objectStoreNames.contains("repos")) {
+					db.createObjectStore("repos");
+				}
+			};
+			request.onsuccess = () => {
+				const db = request.result;
+				const tx = db.transaction("repos", "readonly");
+				const getReq = tx.objectStore("repos").get(key);
+				getReq.onsuccess = () => {
+					const data = getReq.result as CachedRepoBlob | undefined;
+					if (
+						data &&
+						data.sha &&
+						isCompatibleEmbeddingModel(data.embeddingModel) &&
+						Array.isArray(data.chunks)
+					) {
+						resolve({
+							sha: data.sha,
+							chunks: data.chunks,
+							graph: data.graph || {},
+						});
+					} else {
+						resolve(null);
+					}
+				};
+				getReq.onerror = () => resolve(null);
+			};
+			request.onerror = () => resolve(null);
+		});
+	}
+
+	/**
+	 * Replace in-memory store with the given blob (chunks + graph).
+	 * Rebuilds chunkBinaries and chunksByFile. Used for incremental indexing.
+	 */
+	setFromBlob(data: {
+		chunks: EmbeddedChunk[];
+		graph: StoredRepoGraph;
+	}): void {
+		this.chunks = [...data.chunks];
+		this.graph = { ...data.graph };
+		this.chunksByFile.clear();
+		this.chunkBinaries = [];
+		for (const chunk of this.chunks) {
+			const fileChunks = this.chunksByFile.get(chunk.filePath) || [];
+			fileChunks.push(chunk);
+			this.chunksByFile.set(chunk.filePath, fileChunks);
+			this.chunkBinaries.push(binarize(chunk.embedding));
+		}
+		this.resolveFileDataCache = null;
+		this.resolveFileDataDirty = true;
+	}
+
+	/**
+	 * Remove all chunks whose filePath is in the given set (or array).
+	 * Rebuilds chunks, chunkBinaries, chunksByFile, and removes graph entries for those paths.
+	 */
+	removeChunksByFilePaths(paths: Set<string> | string[]): void {
+		const pathSet = paths instanceof Set ? paths : new Set(paths);
+		const kept: EmbeddedChunk[] = [];
+		const keptBinaries: Uint32Array[] = [];
+		this.chunksByFile.clear();
+		for (let i = 0; i < this.chunks.length; i++) {
+			const chunk = this.chunks[i];
+			if (!pathSet.has(chunk.filePath)) {
+				kept.push(chunk);
+				keptBinaries.push(this.chunkBinaries[i]);
+				const fileChunks = this.chunksByFile.get(chunk.filePath) || [];
+				fileChunks.push(chunk);
+				this.chunksByFile.set(chunk.filePath, fileChunks);
+			}
+		}
+		this.chunks = kept;
+		this.chunkBinaries = keptBinaries;
+		for (const p of pathSet) {
+			delete this.graph[p];
+		}
+		this.resolveFileDataCache = null;
+		this.resolveFileDataDirty = true;
+	}
+
+	/**
+	 * Persist the store to IndexedDB keyed by owner/repo.
+	 */
+	async persist(owner: string, repo: string, sha: string): Promise<void> {
+		this.repoKey = `${owner}/${repo}`;
+		const data: CachedRepoBlob = {
+			sha,
+			timestamp: Date.now(),
+			embeddingModel: EMBEDDING_MODEL_ID,
+			chunks: this.chunks,
+			graph: this.graph,
+		};
+
+		return new Promise((resolve, reject) => {
+			const request = indexedDB.open("gitask-cache", 1);
+			request.onupgradeneeded = () => {
+				const db = request.result;
+				if (!db.objectStoreNames.contains("repos")) {
+					db.createObjectStore("repos");
+				}
+			};
+			request.onsuccess = () => {
+				const db = request.result;
+				const tx = db.transaction("repos", "readwrite");
+				tx.objectStore("repos").put(data, this.repoKey);
+				tx.oncomplete = () => resolve();
+				tx.onerror = () => reject(tx.error);
+			};
+			request.onerror = () => reject(request.error);
+		});
+	}
+
+	/**
+	 * Clear the IndexedDB cache and partial progress for a repo. Does not clear in-memory store.
+	 */
+	async clearCache(owner: string, repo: string): Promise<void> {
+		const key = `${owner}/${repo}`;
+		const partialKey = `${owner}/${repo}-partial`;
+		return new Promise((resolve, reject) => {
+			const request = indexedDB.open("gitask-cache", 1);
+			request.onsuccess = () => {
+				const db = request.result;
+				const tx = db.transaction("repos", "readwrite");
+				const store = tx.objectStore("repos");
+				store.delete(key);
+				store.delete(partialKey);
+				tx.oncomplete = () => resolve();
+				tx.onerror = () => reject(tx.error);
+			};
+			request.onerror = () => reject(request.error);
+		});
+	}
+
+	/**
+	 * Save partial indexing progress for tab-close resilience.
+	 */
+	async savePartialProgress(
+		owner: string,
+		repo: string,
+		data: PartialProgress
+	): Promise<void> {
+		const key = `${owner}/${repo}-partial`;
+		const payload: PartialProgress = {
+			...data,
+			timestamp: Date.now(),
+			embeddingModel: EMBEDDING_MODEL_ID,
+		};
+		return new Promise((resolve, reject) => {
+			const request = indexedDB.open("gitask-cache", 1);
+			request.onupgradeneeded = () => {
+				const db = request.result;
+				if (!db.objectStoreNames.contains("repos")) {
+					db.createObjectStore("repos");
+				}
+			};
+			request.onsuccess = () => {
+				const db = request.result;
+				const tx = db.transaction("repos", "readwrite");
+				tx.objectStore("repos").put(payload, key);
+				tx.oncomplete = () => resolve();
+				tx.onerror = () => reject(tx.error);
+			};
+			request.onerror = () => reject(request.error);
+		});
+	}
+
+	/**
+	 * Load partial progress if it exists and SHA matches.
+	 * Returns null if not found or sha mismatch.
+	 */
+	async loadPartialProgress(
+		owner: string,
+		repo: string,
+		currentSha: string
+	): Promise<PartialProgress | null> {
+		const key = `${owner}/${repo}-partial`;
+		return new Promise((resolve) => {
+			const request = indexedDB.open("gitask-cache", 1);
+			request.onupgradeneeded = () => {
+				const db = request.result;
+				if (!db.objectStoreNames.contains("repos")) {
+					db.createObjectStore("repos");
+				}
+			};
+			request.onsuccess = () => {
+				const db = request.result;
+				const tx = db.transaction("repos", "readonly");
+				const getReq = tx.objectStore("repos").get(key);
+				getReq.onsuccess = () => {
+					const data = getReq.result as PartialProgress | undefined;
+					if (
+						data &&
+						data.sha === currentSha &&
+						isCompatibleEmbeddingModel(data.embeddingModel)
+					) {
+						resolve(data);
+					} else {
+						resolve(null);
+					}
+				};
+				getReq.onerror = () => resolve(null);
+			};
+			request.onerror = () => resolve(null);
+		});
+	}
+
+	/**
+	 * Clear partial progress for a repo.
+	 */
+	async clearPartialProgress(owner: string, repo: string): Promise<void> {
+		const key = `${owner}/${repo}-partial`;
+		return new Promise((resolve, reject) => {
+			const request = indexedDB.open("gitask-cache", 1);
+			request.onsuccess = () => {
+				const db = request.result;
+				const tx = db.transaction("repos", "readwrite");
+				tx.objectStore("repos").delete(key);
+				tx.oncomplete = () => resolve();
+				tx.onerror = () => reject(tx.error);
+			};
+			request.onerror = () => reject(request.error);
+		});
+	}
+
+	/**
+	 * Load from IndexedDB cache if SHA matches.
+	 * Returns true if cache was loaded, false if stale/missing.
+	 */
+	async loadFromCache(
+		owner: string,
+		repo: string,
+		currentSha: string
+	): Promise<boolean> {
+		this.repoKey = `${owner}/${repo}`;
+
+		return new Promise((resolve) => {
+			const request = indexedDB.open("gitask-cache", 1);
+			request.onupgradeneeded = () => {
+				const db = request.result;
+				if (!db.objectStoreNames.contains("repos")) {
+					db.createObjectStore("repos");
+				}
+			};
+			request.onsuccess = () => {
+				const db = request.result;
+				const tx = db.transaction("repos", "readonly");
+				const getReq = tx.objectStore("repos").get(this.repoKey);
+				getReq.onsuccess = () => {
+					const data = getReq.result as CachedRepoBlob | undefined;
+					if (
+						data &&
+						data.sha === currentSha &&
+						isCompatibleEmbeddingModel(data.embeddingModel)
+					) {
+						this.chunks = data.chunks;
+						this.graph = data.graph || {};
+						// Rebuild derived indexes and binary cache.
+						this.chunksByFile.clear();
+						this.chunkBinaries = [];
+						for (const chunk of this.chunks) {
+							const fileChunks = this.chunksByFile.get(chunk.filePath) || [];
+							fileChunks.push(chunk);
+							this.chunksByFile.set(chunk.filePath, fileChunks);
+							this.chunkBinaries.push(binarize(chunk.embedding));
+						}
+						this.resolveFileDataCache = null;
+						this.resolveFileDataDirty = true;
+						resolve(true);
+					} else {
+						resolve(false);
+					}
+				};
+				getReq.onerror = () => resolve(false);
+			};
+			request.onerror = () => resolve(false);
+		});
+	}
+}

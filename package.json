@@ -1,0 +1,40 @@
+{
+  "name": "secask",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev-cleanup.js && next dev --webpack",
+    "build": "rimraf .next/cache && next build --webpack",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@babycommando/entity-db": "^1.0.11",
+    "@google/generative-ai": "^0.24.1",
+    "@huggingface/transformers": "^3.8.1",
+    "@mlc-ai/web-llm": "^0.2.80",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "@vercel/analytics": "^1.6.1",
+    "@xyflow/react": "^12.10.1",
+    "byok-vault": "^0.2.2",
+    "dotenv": "^17.3.1",
+    "framer-motion": "^12.34.3",
+    "html-to-image": "^1.11.13",
+    "lucide-react": "^0.577.0",
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^16.1.1",
+    "web-tree-sitter": "^0.26.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "kill-port": "^2.0.1",
+    "playwright": "^1.58.2",
+    "rimraf": "^6.1.2",
+    "typescript": "^5",
+    "vitest": "^4.0.18"
+  }
+}
