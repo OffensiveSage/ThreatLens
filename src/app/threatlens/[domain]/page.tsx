@@ -82,6 +82,7 @@ import { indexNVD } from "@/lib/connectors/nvd";
 import { indexNIST } from "@/lib/connectors/nist";
 import { indexUpload } from "@/lib/connectors/upload";
 import type { ConnectorProgress } from "@/lib/connectors/attack";
+import { generatePDFReport, generateMarkdownReport } from "@/lib/reportGenerator";
 
 // ─── Domain config ────────────────────────────────────────────────────────────
 
@@ -373,12 +374,14 @@ function MessageBubble({
 	usedMode,
 	onOpenContext,
 	isMobile,
+	domain,
 }: {
 	msg: Message;
 	isLast: boolean;
 	usedMode?: SecurityMode;
 	onOpenContext?: () => void;
 	isMobile?: boolean;
+	domain?: string;
 }) {
 	const isUser = msg.role === "user";
 	const isThinking = isLast && !isUser && msg.content === "";
@@ -467,6 +470,56 @@ function MessageBubble({
 							onClick={onOpenContext}
 						/>
 					))}
+				</div>
+			)}
+
+			{/* Per-message export buttons (assistant only, non-empty) */}
+			{!isUser && !isThinking && msg.content && (
+				<div style={{ display: "flex", gap: 6 }}>
+					<button
+						onClick={() =>
+							generatePDFReport([msg], {
+								sources: [domain ?? "threatlens"],
+								target: domain,
+							})
+						}
+						style={{
+							background: "var(--bg-paper-alt)",
+							border: "1.5px solid var(--border-black)",
+							color: "var(--ink-medium)",
+							padding: "3px 9px",
+							fontFamily: "var(--font-mono)",
+							fontSize: "9px",
+							fontWeight: 700,
+							textTransform: "uppercase",
+							letterSpacing: "0.05em",
+							cursor: "pointer",
+						}}
+					>
+						↓ PDF
+					</button>
+					<button
+						onClick={() =>
+							generateMarkdownReport([msg], {
+								sources: [domain ?? "threatlens"],
+								target: domain,
+							})
+						}
+						style={{
+							background: "var(--bg-paper-alt)",
+							border: "1.5px solid var(--border-black)",
+							color: "var(--ink-medium)",
+							padding: "3px 9px",
+							fontFamily: "var(--font-mono)",
+							fontSize: "9px",
+							fontWeight: 700,
+							textTransform: "uppercase",
+							letterSpacing: "0.05em",
+							cursor: "pointer",
+						}}
+					>
+						↓ MD
+					</button>
 				</div>
 			)}
 		</motion.div>
@@ -1309,6 +1362,31 @@ export default function SecurityDomainPage({
 							CONTEXT {contextChunks.length > 0 ? `(${contextChunks.length})` : ""}
 						</button>
 					)}
+					{isIndexed && messages.some((m) => m.role === "assistant") && (
+						<button
+							onClick={() =>
+								generatePDFReport(messages, {
+									sources: [domain],
+									target: domain,
+								})
+							}
+							style={{
+								background: "var(--accent-amber)",
+								color: "#0F0F0F",
+								border: "2px solid #000",
+								padding: "4px 10px",
+								fontFamily: "var(--font-mono)",
+								fontSize: "0.68rem",
+								cursor: "pointer",
+								fontWeight: 700,
+								letterSpacing: "0.04em",
+								textTransform: "uppercase",
+								boxShadow: "var(--shadow-subtle)",
+							}}
+						>
+							↓ REPORT
+						</button>
+					)}
 					{isIndexed && (
 						<button
 							onClick={handleCreateChat}
@@ -1328,6 +1406,23 @@ export default function SecurityDomainPage({
 							+ NEW CHAT
 						</button>
 					)}
+					<button
+						onClick={() => router.push("/dashboard")}
+						style={{
+							background: "none",
+							border: "2px solid var(--border-black)",
+							color: "var(--ink-medium)",
+							padding: "4px 10px",
+							fontFamily: "var(--font-mono)",
+							fontSize: "0.68rem",
+							cursor: "pointer",
+							fontWeight: 700,
+							letterSpacing: "0.04em",
+							textTransform: "uppercase",
+						}}
+					>
+						DASHBOARD
+					</button>
 					<button
 						onClick={handleDeleteEmbeddings}
 						style={{
@@ -1556,6 +1651,7 @@ export default function SecurityDomainPage({
 									usedMode={msg.role === "assistant" ? activeMode : undefined}
 									onOpenContext={() => setShowContext(true)}
 									isMobile={isMobile}
+									domain={domain}
 								/>
 							))}
 							<div ref={chatEndRef} />

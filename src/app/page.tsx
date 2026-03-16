@@ -318,6 +318,24 @@ export default function LandingPage() {
         </span>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <ModelSettings />
+          <button
+            onClick={() => router.push("/dashboard")}
+            style={{
+              fontSize: "12px",
+              fontWeight: 700,
+              color: "var(--ink-medium)",
+              background: "none",
+              textDecoration: "none",
+              border: "2px solid var(--border-black)",
+              padding: "6px 14px",
+              fontFamily: "var(--font-mono)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              cursor: "pointer",
+            }}
+          >
+            Dashboard
+          </button>
           <a
             href="https://github.com/OffensiveSage/ThreatLens"
             target="_blank"
