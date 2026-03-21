@@ -5,9 +5,7 @@ import { prepareGeminiChat } from "@/lib/chatHistory";
 // Prevent static optimization - fixes 405 on Vercel production
 export const dynamic = "force-dynamic";
 
-// Initialize Gemini with server-side key
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 interface GeminiErrorPayload {
 	error: string;
@@ -99,7 +97,7 @@ export async function POST(req: Request) {
 			);
 		}
 
-		const { messages, safetyMeta } = await req.json();
+		const { messages, safetyMeta, temperature } = await req.json();
 
 		if (!messages || !Array.isArray(messages)) {
 			return NextResponse.json(
@@ -113,6 +111,8 @@ export async function POST(req: Request) {
 				{ status: 400 }
 			);
 		}
+
+		const safeTemperature = typeof temperature === "number" ? temperature : 0.2;
 
 		let history;
 		let prompt;
@@ -129,6 +129,10 @@ export async function POST(req: Request) {
 
 		// Resolve Gemini stream before returning HTTP 200 so auth/quota errors
 		// can be mapped to correct HTTP status codes.
+		const model = genAI.getGenerativeModel({
+			model: "gemini-2.5-flash",
+			generationConfig: { temperature: safeTemperature },
+		});
 		const chat = model.startChat({ history });
 		const result = await chat.sendMessageStream(prompt);
 

@@ -46,14 +46,14 @@ const SEV_LABEL: Record<Severity, string> = {
 };
 
 function DonutChart({ counts, total }: DonutChartProps) {
-	const cx = 60, cy = 60, r = 44, strokeW = 14;
+	const cx = 80, cy = 80, r = 58, strokeW = 18;
 	const innerR = r - strokeW / 2;
 
 	if (total === 0) {
 		return (
-			<svg width={120} height={120} viewBox="0 0 120 120">
-				<circle cx={cx} cy={cy} r={innerR} fill="none" stroke="var(--bg-paper-alt)" strokeWidth={strokeW} />
-				<text x={cx} y={cy + 5} textAnchor="middle" fontSize={12} fill="var(--ink-light)" fontFamily="var(--font-mono)">
+			<svg width={160} height={160} viewBox="0 0 160 160">
+				<circle cx={cx} cy={cy} r={innerR} fill="none" stroke="#D0D0D0" strokeWidth={strokeW} />
+				<text x={cx} y={cy + 5} textAnchor="middle" fontSize={14} fill="#888888" fontFamily="monospace">
 					0
 				</text>
 			</svg>
@@ -71,9 +71,9 @@ function DonutChart({ counts, total }: DonutChartProps) {
 	}
 
 	return (
-		<svg width={120} height={120} viewBox="0 0 120 120">
-			{/* Background ring */}
-			<circle cx={cx} cy={cy} r={innerR} fill="none" stroke="var(--bg-paper-alt)" strokeWidth={strokeW} />
+		<svg width={160} height={160} viewBox="0 0 160 160">
+			{/* Background ring — hardcoded so it stays visible in both dark UI and white print */}
+			<circle cx={cx} cy={cy} r={innerR} fill="none" stroke="#D0D0D0" strokeWidth={strokeW} />
 			{/* Colored arcs */}
 			{slices.map(({ sev, startDeg, endDeg }) => (
 				<path
@@ -86,10 +86,10 @@ function DonutChart({ counts, total }: DonutChartProps) {
 				/>
 			))}
 			{/* Center total */}
-			<text x={cx} y={cy - 6} textAnchor="middle" fontSize={18} fontWeight={700} fill="var(--ink-black)" fontFamily="var(--font-mono)">
+			<text x={cx} y={cy - 8} textAnchor="middle" fontSize={24} fontWeight={700} fill="var(--ink-black)" fontFamily="var(--font-mono)">
 				{total}
 			</text>
-			<text x={cx} y={cy + 10} textAnchor="middle" fontSize={9} fill="var(--ink-medium)" fontFamily="var(--font-sans)" style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>
+			<text x={cx} y={cy + 12} textAnchor="middle" fontSize={10} fill="var(--ink-medium)" fontFamily="var(--font-sans)" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
 				findings
 			</text>
 		</svg>
@@ -108,22 +108,23 @@ interface CategoryBarProps {
 function CategoryBar({ label, count, maxCount, color }: CategoryBarProps) {
 	const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
 	return (
-		<div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-			<span style={{ width: 160, fontSize: 11, fontFamily: "var(--font-sans)", color: "var(--ink-medium)", flexShrink: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+		<div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+			<span style={{ width: 170, fontSize: 12, fontFamily: "var(--font-sans)", color: "var(--ink-medium)", flexShrink: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 500 }}>
 				{label}
 			</span>
-			<div style={{ flex: 1, height: 10, background: "var(--bg-paper-alt)", borderRadius: 1, overflow: "hidden" }}>
+			{/* hardcoded track bg so it's visible in both dark UI and white print */}
+			<div style={{ flex: 1, height: 14, background: "#D8D8D8", borderRadius: 2, overflow: "hidden", border: "1px solid #BBBBBB" }}>
 				<div
 					style={{
 						width: `${pct}%`,
 						height: "100%",
 						background: color,
 						transition: "width 0.6s ease",
-						borderRadius: 1,
+						borderRadius: 2,
 					}}
 				/>
 			</div>
-			<span style={{ width: 24, fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--ink-black)", fontWeight: 700, textAlign: "right", flexShrink: 0 }}>
+			<span style={{ width: 28, fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--ink-black)", fontWeight: 800, textAlign: "right", flexShrink: 0 }}>
 				{count}
 			</span>
 		</div>
@@ -202,12 +203,12 @@ function RiskHero({ score, grade, counts }: RiskHeroProps) {
 
 function SeverityLegend({ counts }: { counts: SeverityCounts }) {
 	return (
-		<div style={{ display: "flex", flexWrap: "wrap", gap: "10px 18px", marginTop: 12 }}>
+		<div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 14 }}>
 			{(["critical", "high", "medium", "low", "info"] as Severity[]).map((sev) => (
 				<div key={sev} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-					<div style={{ width: 10, height: 10, borderRadius: 1, background: severityColor(sev) }} />
-					<span style={{ fontFamily: "var(--font-sans)", fontSize: 11, color: "var(--ink-medium)" }}>
-						{SEV_LABEL[sev]} ({counts[sev]})
+					<div style={{ width: 12, height: 12, borderRadius: 2, background: severityColor(sev), flexShrink: 0 }} />
+					<span style={{ fontFamily: "var(--font-sans)", fontSize: 12, color: "var(--ink-medium)", fontWeight: counts[sev] > 0 ? 600 : 400 }}>
+						{SEV_LABEL[sev]} <strong style={{ color: counts[sev] > 0 ? severityColor(sev) : "inherit" }}>{counts[sev]}</strong>
 					</span>
 				</div>
 			))}
@@ -452,7 +453,7 @@ export function ScanReport({ owner, repo, findings, scannedAt, onClose, onPrint 
 						All Findings ({total})
 					</div>
 					{sectionNames.map((sectionName) => (
-						<div key={sectionName} style={{ marginBottom: 28 }}>
+						<div key={sectionName} className="finding-section" style={{ marginBottom: 28 }}>
 							<div style={{
 								fontFamily: "var(--font-mono)",
 								fontSize: 12,

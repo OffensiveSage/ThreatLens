@@ -1,0 +1,62 @@
+{
+  "functions": [
+    {
+      "id": "ID",
+      "name": "Identify",
+      "color": "#64B5F6",
+      "categories": [
+        { "id": "ID.AM", "name": "Asset Management" },
+        { "id": "ID.BE", "name": "Business Environment" },
+        { "id": "ID.GV", "name": "Governance" },
+        { "id": "ID.RA", "name": "Risk Assessment" },
+        { "id": "ID.RM", "name": "Risk Management Strategy" },
+        { "id": "ID.SC", "name": "Supply Chain Risk Management" }
+      ]
+    },
+    {
+      "id": "PR",
+      "name": "Protect",
+      "color": "#F5A623",
+      "categories": [
+        { "id": "PR.AC", "name": "Identity Management & Access Control" },
+        { "id": "PR.AT", "name": "Awareness and Training" },
+        { "id": "PR.DS", "name": "Data Security" },
+        { "id": "PR.IP", "name": "Information Protection Processes" },
+        { "id": "PR.MA", "name": "Maintenance" },
+        { "id": "PR.PT", "name": "Protective Technology" }
+      ]
+    },
+    {
+      "id": "DE",
+      "name": "Detect",
+      "color": "#66BB6A",
+      "categories": [
+        { "id": "DE.AE", "name": "Anomalies and Events" },
+        { "id": "DE.CM", "name": "Security Continuous Monitoring" },
+        { "id": "DE.DP", "name": "Detection Processes" }
+      ]
+    },
+    {
+      "id": "RS",
+      "name": "Respond",
+      "color": "#FF8A65",
+      "categories": [
+        { "id": "RS.RP", "name": "Response Planning" },
+        { "id": "RS.CO", "name": "Communications" },
+        { "id": "RS.AN", "name": "Analysis" },
+        { "id": "RS.MI", "name": "Mitigation" },
+        { "id": "RS.IM", "name": "Improvements" }
+      ]
+    },
+    {
+      "id": "RC",
+      "name": "Recover",
+      "color": "#CE93D8",
+      "categories": [
+        { "id": "RC.RP", "name": "Recovery Planning" },
+        { "id": "RC.IM", "name": "Improvements" },
+        { "id": "RC.CO", "name": "Communications" }
+      ]
+    }
+  ]
+}

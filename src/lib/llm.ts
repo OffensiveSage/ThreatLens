@@ -154,7 +154,7 @@ interface LLMEngine {
 		messages: ChatMessage[],
 		temperature?: number
 	): AsyncGenerator<string, void, undefined>;
-	generateFull(messages: ChatMessage[]): Promise<string>;
+	generateFull(messages: ChatMessage[], temperature?: number): Promise<string>;
 	dispose(): Promise<void>;
 }
 
@@ -347,10 +347,10 @@ class MLCEngineWrapper implements LLMEngine {
 		}
 	}
 
-	async generateFull(messages: ChatMessage[]): Promise<string> {
+	async generateFull(messages: ChatMessage[], temperature = 0.2): Promise<string> {
 		const reply = await this.rawEngine.chat.completions.create({
 			messages,
-			temperature: 0.2,
+			temperature,
 			max_tokens: 512,
 		});
 		return reply.choices?.[0]?.message?.content ?? "";
@@ -442,7 +442,7 @@ class GeminiEngineWrapper implements LLMEngine {
 			const response = await fetch("/api/gemini", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ messages }),
+				body: JSON.stringify({ messages, temperature }),
 			});
 
 			if (!response.ok) {
@@ -550,9 +550,9 @@ class GeminiEngineWrapper implements LLMEngine {
 		}
 	}
 
-	async generateFull(messages: ChatMessage[]): Promise<string> {
+	async generateFull(messages: ChatMessage[], temperature = 0.2): Promise<string> {
 		let fullText = "";
-		for await (const chunk of this.generateStream(messages)) {
+		for await (const chunk of this.generateStream(messages, temperature)) {
 			fullText += chunk;
 		}
 		return fullText;
@@ -693,7 +693,7 @@ class GroqEngineWrapper implements LLMEngine {
 			const response = await fetch("/api/groq", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ messages }),
+				body: JSON.stringify({ messages, temperature }),
 			});
 
 			if (!response.ok) {
@@ -796,9 +796,9 @@ class GroqEngineWrapper implements LLMEngine {
 		}
 	}
 
-	async generateFull(messages: ChatMessage[]): Promise<string> {
+	async generateFull(messages: ChatMessage[], temperature = 0.2): Promise<string> {
 		let fullText = "";
-		for await (const chunk of this.generateStream(messages)) {
+		for await (const chunk of this.generateStream(messages, temperature)) {
 			fullText += chunk;
 		}
 		return fullText;
@@ -986,13 +986,16 @@ export async function* generate(
 	}
 }
 
-export async function generateFull(messages: ChatMessage[]): Promise<string> {
+export async function generateFull(
+	messages: ChatMessage[],
+	temperature?: number
+): Promise<string> {
 	if (!activeEngine)
 		throw new Error("LLM not initialised. Call initLLM() first.");
 
 	setStatus("generating");
 	try {
-		return await activeEngine.generateFull(messages);
+		return await activeEngine.generateFull(messages, temperature);
 	} finally {
 		setStatus("ready");
 	}

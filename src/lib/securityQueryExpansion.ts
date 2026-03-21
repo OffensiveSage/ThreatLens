@@ -160,7 +160,7 @@ export async function generateSecurityQueryVariants(
 			},
 		];
 
-		const response = (await generateFull(messages)).trim();
+		const response = (await generateFull(messages, 0.1)).trim();
 		if (!response) return [trimmed];
 
 		const variants = response

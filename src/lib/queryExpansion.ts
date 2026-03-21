@@ -129,7 +129,7 @@ export async function generateQueryVariants(
 			},
 		];
 
-		const response = (await generateFull(messages)).trim();
+		const response = (await generateFull(messages, 0.1)).trim();
 		if (!response) return fallback;
 
 		const variants = response
@@ -187,7 +187,7 @@ export async function getRetrievalRefinement(
 			},
 		];
 
-		const response = (await generateFull(messages)).trim();
+		const response = (await generateFull(messages, 0.1)).trim();
 		if (!response || response === "SUFFICIENT" || response.length > 200) return null;
 		return response;
 	} catch {

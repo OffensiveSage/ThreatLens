@@ -86,10 +86,11 @@ export async function POST(req: Request) {
 			);
 		}
 
-		const { messages } = await req.json();
+		const { messages, temperature } = await req.json();
 		if (!messages || !Array.isArray(messages)) {
 			return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
 		}
+		const safeTemperature = typeof temperature === "number" ? temperature : 0.2;
 
 		const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
 			method: "POST",
@@ -102,7 +103,7 @@ export async function POST(req: Request) {
 				messages,
 				stream: true,
 				stream_options: { include_usage: true },
-				temperature: 0.2,
+				temperature: safeTemperature,
 			}),
 		});
 

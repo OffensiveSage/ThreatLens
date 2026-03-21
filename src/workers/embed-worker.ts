@@ -7,7 +7,7 @@
  * Created by embedder.ts when workerCount > 1 on WASM devices.
  */
 
-import { initEmbedder, embedTexts } from "../lib/embedder";
+import { initEmbedder, embedTexts } from "../lib/embedder-core";
 
 interface EmbedRequest {
 	type: "embed";

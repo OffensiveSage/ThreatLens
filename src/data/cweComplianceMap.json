@@ -1,0 +1,188 @@
+{
+  "CWE-78": {
+    "name": "OS Command Injection",
+    "nist_800_53": ["SI-10", "SA-11", "SC-39"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-5" },
+    "nis2_articles": ["Article 21(2)(e) - Network and information systems security"]
+  },
+  "CWE-79": {
+    "name": "Cross-site Scripting (XSS)",
+    "nist_800_53": ["SI-10", "SA-11"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-5" },
+    "nis2_articles": ["Article 21(2)(e) - Network and information systems security"]
+  },
+  "CWE-89": {
+    "name": "SQL Injection",
+    "nist_800_53": ["SI-10", "SA-11", "SA-15"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-5" },
+    "nis2_articles": ["Article 21(2)(e) - Network and information systems security"]
+  },
+  "CWE-200": {
+    "name": "Information Exposure",
+    "nist_800_53": ["AC-4", "SC-8", "SI-11"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-2" },
+    "nis2_articles": ["Article 21(2)(d) - Supply chain security"]
+  },
+  "CWE-209": {
+    "name": "Information Exposure Through Error Message",
+    "nist_800_53": ["SI-11", "SA-11"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-5" },
+    "nis2_articles": ["Article 21(2)(e) - Network and information systems security"]
+  },
+  "CWE-20": {
+    "name": "Improper Input Validation",
+    "nist_800_53": ["SI-10", "SA-11"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-5" },
+    "nis2_articles": ["Article 21(2)(e) - Network and information systems security"]
+  },
+  "CWE-22": {
+    "name": "Path Traversal",
+    "nist_800_53": ["AC-6", "SI-10", "SA-11"],
+    "nist_csf": { "function": "Protect", "category": "PR.AC", "subcategory": "PR.AC-4" },
+    "nis2_articles": ["Article 21(2)(e) - Network and information systems security"]
+  },
+  "CWE-250": {
+    "name": "Execution with Unnecessary Privileges",
+    "nist_800_53": ["AC-6", "CM-7"],
+    "nist_csf": { "function": "Protect", "category": "PR.AC", "subcategory": "PR.AC-4" },
+    "nis2_articles": ["Article 21(2)(i) - Human resources security, access control policies"]
+  },
+  "CWE-259": {
+    "name": "Use of Hard-coded Password",
+    "nist_800_53": ["IA-5", "SC-12", "SC-13"],
+    "nist_csf": { "function": "Protect", "category": "PR.AC", "subcategory": "PR.AC-1" },
+    "nis2_articles": ["Article 21(2)(d) - Supply chain security", "Article 21(2)(j) - Multi-factor authentication"]
+  },
+  "CWE-261": {
+    "name": "Weak Encoding for Password",
+    "nist_800_53": ["IA-5", "SC-13"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-1" },
+    "nis2_articles": ["Article 21(2)(d) - Supply chain security"]
+  },
+  "CWE-284": {
+    "name": "Improper Access Control",
+    "nist_800_53": ["AC-3", "AC-6"],
+    "nist_csf": { "function": "Protect", "category": "PR.AC", "subcategory": "PR.AC-4" },
+    "nis2_articles": ["Article 21(2)(i) - Human resources security, access control policies"]
+  },
+  "CWE-287": {
+    "name": "Improper Authentication",
+    "nist_800_53": ["IA-2", "IA-5", "IA-8"],
+    "nist_csf": { "function": "Protect", "category": "PR.AC", "subcategory": "PR.AC-7" },
+    "nis2_articles": ["Article 21(2)(j) - Multi-factor authentication"]
+  },
+  "CWE-306": {
+    "name": "Missing Authentication for Critical Function",
+    "nist_800_53": ["IA-2", "AC-3"],
+    "nist_csf": { "function": "Protect", "category": "PR.AC", "subcategory": "PR.AC-7" },
+    "nis2_articles": ["Article 21(2)(j) - Multi-factor authentication"]
+  },
+  "CWE-311": {
+    "name": "Missing Encryption of Sensitive Data",
+    "nist_800_53": ["SC-8", "SC-12", "SC-13", "SC-28"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-1" },
+    "nis2_articles": ["Article 21(2)(d) - Supply chain security"]
+  },
+  "CWE-319": {
+    "name": "Cleartext Transmission of Sensitive Info",
+    "nist_800_53": ["SC-8", "SC-23"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-2" },
+    "nis2_articles": ["Article 21(2)(d) - Supply chain security"]
+  },
+  "CWE-326": {
+    "name": "Inadequate Encryption Strength",
+    "nist_800_53": ["SC-12", "SC-13"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-1" },
+    "nis2_articles": ["Article 21(2)(d) - Supply chain security"]
+  },
+  "CWE-327": {
+    "name": "Use of Broken Crypto Algorithm",
+    "nist_800_53": ["SC-13"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-1" },
+    "nis2_articles": ["Article 21(2)(d) - Supply chain security"]
+  },
+  "CWE-352": {
+    "name": "Cross-Site Request Forgery (CSRF)",
+    "nist_800_53": ["SI-10", "SC-23"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-5" },
+    "nis2_articles": ["Article 21(2)(e) - Network and information systems security"]
+  },
+  "CWE-434": {
+    "name": "Unrestricted Upload of Dangerous File Type",
+    "nist_800_53": ["SI-10", "CM-7"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-5" },
+    "nis2_articles": ["Article 21(2)(e) - Network and information systems security"]
+  },
+  "CWE-502": {
+    "name": "Deserialization of Untrusted Data",
+    "nist_800_53": ["SI-10", "SA-11"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-5" },
+    "nis2_articles": ["Article 21(2)(e) - Network and information systems security"]
+  },
+  "CWE-522": {
+    "name": "Insufficiently Protected Credentials",
+    "nist_800_53": ["IA-5", "SC-28"],
+    "nist_csf": { "function": "Protect", "category": "PR.AC", "subcategory": "PR.AC-1" },
+    "nis2_articles": ["Article 21(2)(j) - Multi-factor authentication"]
+  },
+  "CWE-532": {
+    "name": "Information Exposure Through Log Files",
+    "nist_800_53": ["AU-9", "SI-11"],
+    "nist_csf": { "function": "Detect", "category": "DE.AE", "subcategory": "DE.AE-3" },
+    "nis2_articles": ["Article 21(2)(g) - Basic cyber hygiene practices"]
+  },
+  "CWE-611": {
+    "name": "Improper Restriction of XML External Entity Reference",
+    "nist_800_53": ["SI-10", "SA-11"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-5" },
+    "nis2_articles": ["Article 21(2)(e) - Network and information systems security"]
+  },
+  "CWE-639": {
+    "name": "Authorization Bypass Through User-Controlled Key (IDOR)",
+    "nist_800_53": ["AC-3", "AC-6"],
+    "nist_csf": { "function": "Protect", "category": "PR.AC", "subcategory": "PR.AC-4" },
+    "nis2_articles": ["Article 21(2)(i) - Human resources security, access control policies"]
+  },
+  "CWE-732": {
+    "name": "Incorrect Permission Assignment",
+    "nist_800_53": ["AC-3", "AC-6"],
+    "nist_csf": { "function": "Protect", "category": "PR.AC", "subcategory": "PR.AC-4" },
+    "nis2_articles": ["Article 21(2)(i) - Human resources security, access control policies"]
+  },
+  "CWE-778": {
+    "name": "Insufficient Logging",
+    "nist_800_53": ["AU-2", "AU-3", "AU-12"],
+    "nist_csf": { "function": "Detect", "category": "DE.AE", "subcategory": "DE.AE-3" },
+    "nis2_articles": ["Article 21(2)(g) - Basic cyber hygiene practices"]
+  },
+  "CWE-798": {
+    "name": "Use of Hard-coded Credentials",
+    "nist_800_53": ["IA-5", "SC-12"],
+    "nist_csf": { "function": "Protect", "category": "PR.AC", "subcategory": "PR.AC-1" },
+    "nis2_articles": ["Article 21(2)(d) - Supply chain security", "Article 21(2)(j) - Multi-factor authentication"]
+  },
+  "CWE-840": {
+    "name": "Business Logic Errors",
+    "nist_800_53": ["SA-11", "SA-15"],
+    "nist_csf": { "function": "Protect", "category": "PR.IP", "subcategory": "PR.IP-2" },
+    "nis2_articles": ["Article 21(2)(e) - Network and information systems security"]
+  },
+  "CWE-862": {
+    "name": "Missing Authorization",
+    "nist_800_53": ["AC-3", "AC-6"],
+    "nist_csf": { "function": "Protect", "category": "PR.AC", "subcategory": "PR.AC-4" },
+    "nis2_articles": ["Article 21(2)(i) - Human resources security, access control policies"]
+  },
+  "CWE-918": {
+    "name": "Server-Side Request Forgery (SSRF)",
+    "nist_800_53": ["SI-10", "SC-7"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-5" },
+    "nis2_articles": ["Article 21(2)(e) - Network and information systems security"]
+  },
+  "CWE-1004": {
+    "name": "Sensitive Cookie Without HttpOnly Flag",
+    "nist_800_53": ["SC-23"],
+    "nist_csf": { "function": "Protect", "category": "PR.DS", "subcategory": "PR.DS-2" },
+    "nis2_articles": ["Article 21(2)(e) - Network and information systems security"]
+  }
+}

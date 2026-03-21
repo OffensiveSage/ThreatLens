@@ -1,0 +1,92 @@
+{
+  "articles": [
+    {
+      "id": "Art21-2a",
+      "article": "Article 21(2)(a)",
+      "title": "Policies on risk analysis and information system security",
+      "description": "Establish and maintain policies for risk analysis and information system security",
+      "assessable_from_code": false,
+      "fallback_status": "Not Assessed - Requires policy review"
+    },
+    {
+      "id": "Art21-2b",
+      "article": "Article 21(2)(b)",
+      "title": "Incident handling",
+      "description": "Procedures for handling security incidents including detection, response, and reporting",
+      "assessable_from_code": false,
+      "fallback_status": "Not Assessed - Requires IR plan review"
+    },
+    {
+      "id": "Art21-2c",
+      "article": "Article 21(2)(c)",
+      "title": "Business continuity and crisis management",
+      "description": "Business continuity including backup management, disaster recovery, and crisis management",
+      "assessable_from_code": false,
+      "fallback_status": "Not Assessed - Requires BCP review"
+    },
+    {
+      "id": "Art21-2d",
+      "article": "Article 21(2)(d)",
+      "title": "Supply chain security",
+      "description": "Security in network and information systems acquisition, development, and maintenance including vulnerability handling and disclosure",
+      "assessable_from_code": true,
+      "code_indicators": ["CWE-311", "CWE-319", "CWE-326", "CWE-327", "CWE-259", "CWE-798", "CWE-200"]
+    },
+    {
+      "id": "Art21-2e",
+      "article": "Article 21(2)(e)",
+      "title": "Network and information systems security",
+      "description": "Security in network and information systems acquisition, development and maintenance, including vulnerability handling and disclosure",
+      "assessable_from_code": true,
+      "code_indicators": ["CWE-79", "CWE-89", "CWE-78", "CWE-20", "CWE-352", "CWE-434", "CWE-502", "CWE-611", "CWE-918", "CWE-22", "CWE-209", "CWE-840"]
+    },
+    {
+      "id": "Art21-2f",
+      "article": "Article 21(2)(f)",
+      "title": "Vulnerability assessment and handling",
+      "description": "Policies and procedures for assessing the effectiveness of cybersecurity risk management measures",
+      "assessable_from_code": false,
+      "fallback_status": "Not Assessed - Requires vulnerability management process review"
+    },
+    {
+      "id": "Art21-2g",
+      "article": "Article 21(2)(g)",
+      "title": "Basic cyber hygiene and security training",
+      "description": "Basic cyber hygiene practices and cybersecurity training",
+      "assessable_from_code": true,
+      "code_indicators": ["CWE-778", "CWE-532"]
+    },
+    {
+      "id": "Art21-2h",
+      "article": "Article 21(2)(h)",
+      "title": "Cryptography and encryption",
+      "description": "Policies and procedures regarding the use of cryptography and where appropriate, encryption",
+      "assessable_from_code": true,
+      "code_indicators": ["CWE-311", "CWE-319", "CWE-326", "CWE-327", "CWE-261"]
+    },
+    {
+      "id": "Art21-2i",
+      "article": "Article 21(2)(i)",
+      "title": "Human resources security and access control",
+      "description": "Human resources security, access control policies and asset management",
+      "assessable_from_code": true,
+      "code_indicators": ["CWE-284", "CWE-287", "CWE-306", "CWE-639", "CWE-732", "CWE-862", "CWE-250"]
+    },
+    {
+      "id": "Art21-2j",
+      "article": "Article 21(2)(j)",
+      "title": "Multi-factor authentication and secure communications",
+      "description": "Use of multi-factor authentication or continuous authentication solutions, secured voice, video, text communications and secured emergency communication systems",
+      "assessable_from_code": true,
+      "code_indicators": ["CWE-287", "CWE-306", "CWE-522", "CWE-259", "CWE-798"]
+    },
+    {
+      "id": "Art23",
+      "article": "Article 23",
+      "title": "Incident reporting obligations",
+      "description": "Obligation to report significant incidents to competent authorities within 24/72 hours",
+      "assessable_from_code": false,
+      "fallback_status": "Not Assessed - Requires incident reporting process review"
+    }
+  ]
+}

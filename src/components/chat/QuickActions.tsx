@@ -9,6 +9,7 @@ import {
 	Bug, List, ClipboardList, CheckSquare,
 	type LucideIcon,
 } from "lucide-react";
+import type { ScanMode } from "@/lib/agenticScan";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -191,13 +192,23 @@ export async function checkNvdIndexed(): Promise<boolean> {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+// Repo quick actions that should trigger the agentic scan pipeline instead of chat
+const SCAN_ACTION_MODES: Record<string, ScanMode> = {
+	scan: "full",
+	deps: "deps",
+	secrets: "secrets",
+	"attack-surface": "attack-surface",
+	improve: "improvements",
+};
+
 interface QuickActionsProps {
 	source: "repo" | "attack" | "sigma" | "nvd" | "nist" | "custom";
 	onSend: (prompt: string) => void;
+	onScanAction?: (mode: ScanMode) => void;
 	isNvdIndexed?: boolean;
 }
 
-export function QuickActions({ source, onSend, isNvdIndexed = false }: QuickActionsProps) {
+export function QuickActions({ source, onSend, onScanAction, isNvdIndexed = false }: QuickActionsProps) {
 	const router = useRouter();
 	const [nvdPopoverOpen, setNvdPopoverOpen] = useState(false);
 	const popoverContainerRef = useRef<HTMLDivElement>(null);
@@ -270,6 +281,8 @@ export function QuickActions({ source, onSend, isNvdIndexed = false }: QuickActi
 								onClick={() => {
 									if (isGated) {
 										setNvdPopoverOpen((v) => !v);
+									} else if (source === "repo" && onScanAction && action.id in SCAN_ACTION_MODES) {
+										onScanAction(SCAN_ACTION_MODES[action.id]);
 									} else {
 										onSend(action.prompt);
 									}
