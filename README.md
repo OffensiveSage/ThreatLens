@@ -305,7 +305,7 @@ Then add a route in `DOMAIN_META` in `threatlens/[domain]/page.tsx` and a card o
 
 ## Contributing
 
-PRs and issues welcome. The connector pattern is designed to be extended — the hardest part of a new source is usually deciding how to chunk the data.
+PRs and issues always welcome. The connector pattern is designed to be extended — the hardest part of a new source is usually deciding how to chunk the data.
 
 If you find a retrieval quality issue, open an issue with the query and what you expected. Cross-domain correlation is the trickiest part and always has room to improve.
 
