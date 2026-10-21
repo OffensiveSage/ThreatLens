@@ -31,7 +31,7 @@
     "react-dom": "19.2.3",
     "react-is": "^19.2.4",
     "react-markdown": "^10.1.0",
-    "react-syntax-highlighter": "^16.1.1",
+    "react-syntax-highlighter": "^16.1.2",
     "recharts": "^3.8.0",
     "web-tree-sitter": "^0.26.5"
   },
