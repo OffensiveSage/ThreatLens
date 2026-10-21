@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "node scripts/dev-cleanup.js && next dev --webpack",
     "build": "rimraf .next/cache && next build --webpack",
-    "start": "next start"
+    "start": "next start",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@babycommando/entity-db": "^1.0.11",
