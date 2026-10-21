@@ -17,7 +17,28 @@ import { describe, it } from "vitest";
 import { fetchRepoTree, fetchFileContent, isIndexable, prioritiseFiles } from "./github";
 import { chunkCode, detectLanguage } from "./chunker";
 import { initEmbedder, embedChunks } from "./embedder";
-import { pooledMap } from "./indexer";
+
+/** Runs fn over items with at most `concurrency` in flight; failed items resolve to null. */
+async function pooledMap<T, R>(
+	items: T[],
+	fn: (item: T) => Promise<R>,
+	concurrency: number
+): Promise<(R | null)[]> {
+	const results: (R | null)[] = new Array(items.length).fill(null);
+	let next = 0;
+	async function worker() {
+		while (next < items.length) {
+			const i = next++;
+			try {
+				results[i] = await fn(items[i]);
+			} catch {
+				results[i] = null;
+			}
+		}
+	}
+	await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+	return results;
+}
 
 // ---- Configure target repo here --------------------------------------------
 const BENCH_OWNER = "TanStack";
@@ -41,7 +62,8 @@ function fmtThroughput(count: number, totalMs: number, unit: string): string {
 
 // ---------------------------------------------------------------------------
 
-describe("Pipeline Speed Benchmark", () => {
+// Needs live network access (GitHub API + model download); opt in with RUN_BENCHMARKS=1.
+describe.skipIf(!process.env.RUN_BENCHMARKS)("Pipeline Speed Benchmark", () => {
 	it(
 		`chunking + embedding throughput on ${BENCH_OWNER}/${BENCH_REPO} (top ${MAX_FILES} files)`,
 		async () => {
