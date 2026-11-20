@@ -325,9 +325,13 @@ const CONFIGS: { name: string; fn: SearchFn }[] = [
   { name: "PageIndex (Keyword)", fn: searchPageIndexKeyword },
 ];
 
-describe("Ablation Study", () => {
+// Retrieval benchmark (Recall@5, MRR, NDCG@10, latency) — too slow for every CI run.
+// Opt in with RUN_BENCHMARKS=1; the Benchmarks workflow runs it weekly and on demand.
+const runBenchmarks = Boolean(process.env.RUN_BENCHMARKS);
+
+describe.skipIf(!runBenchmarks)("Ablation Study", () => {
   for (const { name, fn } of CONFIGS) {
-    it(`${name} - produces valid results`, { timeout: 60_000 }, async () => {
+    it(`${name} - produces valid results`, { timeout: 300_000 }, async () => {
       const result = await runBenchmark(name, fn, EVAL_CHUNKS, EVAL_QUERIES);
 
       expect(result.avgRecallAt5).toBeGreaterThanOrEqual(0);
@@ -341,7 +345,7 @@ describe("Ablation Study", () => {
     });
   }
 
-  it("prints summary table", { timeout: 120_000 }, async () => {
+  it("prints summary table", { timeout: 600_000 }, async () => {
     const results = await Promise.all(
       CONFIGS.map(({ name, fn }) => runBenchmark(name, fn, EVAL_CHUNKS, EVAL_QUERIES))
     );
@@ -363,9 +367,9 @@ describe("Ablation Study", () => {
   });
 });
 
-describe("Repo Eval Ablation", () => {
+describe.skipIf(!runBenchmarks)("Repo Eval Ablation", () => {
   for (const { name, fn } of CONFIGS) {
-    it(`${name} - produces valid results on repo corpus`, async () => {
+    it(`${name} - produces valid results on repo corpus`, { timeout: 300_000 }, async () => {
       const result = await runBenchmark(name, fn, REPO_EVAL_CHUNKS, REPO_EVAL_QUERIES);
 
       expect(result.avgRecallAt5).toBeGreaterThanOrEqual(0);
@@ -379,7 +383,7 @@ describe("Repo Eval Ablation", () => {
     });
   }
 
-  it("prints summary table", async () => {
+  it("prints summary table", { timeout: 600_000 }, async () => {
     const results = await Promise.all(
       CONFIGS.map(({ name, fn }) => runBenchmark(name, fn, REPO_EVAL_CHUNKS, REPO_EVAL_QUERIES))
     );
